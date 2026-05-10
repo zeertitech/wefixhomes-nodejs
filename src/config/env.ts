@@ -1,0 +1,62 @@
+import { z } from 'zod';
+import { config } from 'dotenv';
+import path from 'path';
+
+// Load env files in priority order
+const nodeEnv = process.env['NODE_ENV'] ?? 'development';
+config({ path: path.resolve(process.cwd(), `.env.${nodeEnv}`) });
+config({ path: path.resolve(process.cwd(), '.env') }); // fallback
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.coerce.number().default(3000),
+  APP_URL: z.string().url().default('http://localhost:3000'),
+  API_PREFIX: z.string().default('/api/v1'),
+
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+
+  PEPPER_SECRET: z.string().min(32, 'PEPPER_SECRET must be at least 32 characters'),
+
+  R2_ACCOUNT_ID: z.string().min(1),
+  R2_ACCESS_KEY: z.string().min(1),
+  R2_SECRET_KEY: z.string().min(1),
+  R2_BUCKET: z.string().min(1),
+  R2_PUBLIC_URL: z.string().min(1),
+
+  RAZORPAY_KEY_ID: z.string().min(1),
+  RAZORPAY_KEY_SECRET: z.string().min(1),
+  RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
+
+  SMS_API_KEY: z.string().min(1),
+  SMS_TEMPLATE_NAME: z.string().default('ORDERCONF'),
+
+  SHIPROCKET_EMAIL: z.string().email(),
+  SHIPROCKET_PASSWORD: z.string().min(1),
+
+  ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+  RATE_LIMIT_MAX: z.coerce.number().default(100),
+  RATE_LIMIT_WINDOW: z.coerce.number().default(60000),
+
+  MAX_FILE_SIZE: z.string().default('5242880'),
+  ALLOWED_MIME_TYPES: z.string().default('image/jpeg,image/png,image/webp'),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('\n❌ Invalid environment variables:\n');
+  const errors = parsed.error.flatten().fieldErrors;
+  for (const [key, messages] of Object.entries(errors)) {
+    console.error(`  ${key}: ${messages?.join(', ')}`);
+  }
+  console.error('\nPlease check your .env.development file.\n');
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export type Env = z.infer<typeof envSchema>;
