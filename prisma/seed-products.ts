@@ -2,11 +2,15 @@ import { PrismaClient } from '@prisma/client';
 import slugify from 'slugify';
 import * as dotenv from 'dotenv';
 import path from 'path';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.development') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 const categories = [
   { name: 'Men', slug: 'men', description: 'Premium menswear' },
@@ -234,4 +238,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });
