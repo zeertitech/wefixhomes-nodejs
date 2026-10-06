@@ -1,23 +1,48 @@
 import { PrismaClient } from '@prisma/client';
+import { Pool } from 'pg';
+import { PrismaPg } from '@prisma/adapter-pg';
 import argon2 from 'argon2';
 import * as dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env.development') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 const PEPPER = process.env['PEPPER_SECRET'] ?? 'dev_pepper_secret_minimum_32_characters_here!!!';
+
+function generateSalt(): string {
+  return crypto.randomBytes(16).toString('hex');
+}
 
 async function main(): Promise<void> {
   console.log('🌱 Seeding database...\n');
 
+  // ── Roles ─────────────────────────────────────────────────
+  const roles = ['ADMIN', 'STAFF', 'CUSTOMER'];
+  const roleMap: Record<string, number> = {};
+
+  for (const name of roles) {
+    const r = await prisma.role.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+    roleMap[name] = r.id;
+  }
+  console.log('✅ Roles seeded (ADMIN, STAFF, CUSTOMER)');
+
   // ── Admin User ────────────────────────────────────────────
-  const passwordHash = await argon2.hash('Admin@123' + PEPPER, {
+  const adminSalt = generateSalt();
+  const adminPasswordHash = await argon2.hash('Admin@123' + PEPPER, {
     type: argon2.argon2id,
     memoryCost: 65536,
     timeCost: 3,
     parallelism: 4,
+    salt: Buffer.from(adminSalt, 'hex'),
   });
 
   const admin = await prisma.user.upsert({
@@ -25,8 +50,9 @@ async function main(): Promise<void> {
     update: {},
     create: {
       email: 'admin@fashionstore.com',
-      passwordHash,
-      role: 'ADMIN',
+      passwordHash: adminPasswordHash,
+      salt: adminSalt,
+      roleId: roleMap['ADMIN'],
       firstName: 'Admin',
       lastName: 'User',
     },
@@ -208,12 +234,24 @@ async function main(): Promise<void> {
   console.log('✅ Sample coupons seeded (WELCOME10, FLAT100)');
 
   // ── Sample Customer ───────────────────────────────────────
-  const customer = await prisma.customer.upsert({
+  const customerSalt = generateSalt();
+  const customerPasswordHash = await argon2.hash('Customer@123' + PEPPER, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+    salt: Buffer.from(customerSalt, 'hex'),
+  });
+
+  const customer = await prisma.user.upsert({
     where: { email: 'priya@example.com' },
     update: {},
     create: {
       email: 'priya@example.com',
+      passwordHash: customerPasswordHash,
+      salt: customerSalt,
       phone: '9876543210',
+      roleId: roleMap['CUSTOMER'],
       firstName: 'Priya',
       lastName: 'Sharma',
     },
@@ -224,7 +262,7 @@ async function main(): Promise<void> {
     update: {},
     create: {
       id: 'seed-address-001',
-      customerId: customer.id,
+      userId: customer.id,
       name: 'Priya Sharma',
       phone: '9876543210',
       line1: '123 MG Road',
@@ -252,4 +290,8 @@ main()
     console.error('❌ Seed failed:', e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });
+

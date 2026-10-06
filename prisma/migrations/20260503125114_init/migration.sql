@@ -1,5 +1,5 @@
--- CreateEnum
-CREATE TYPE "Role" AS ENUM ('ADMIN', 'STAFF');
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum
 CREATE TYPE "OrderStatus" AS ENUM ('CREATED', 'PAYMENT_PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'FAILED', 'REFUNDED');
@@ -21,15 +21,28 @@ CREATE TABLE "users" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password_hash" TEXT NOT NULL,
-    "role" "Role" NOT NULL DEFAULT 'STAFF',
+    "salt" TEXT NOT NULL,
+    "phone" TEXT,
+    "role_id" INTEGER NOT NULL,
     "first_name" TEXT NOT NULL,
     "last_name" TEXT NOT NULL,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "last_login_at" TIMESTAMP(3),
+    "deleted_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "roles" (
+    "id" SERIAL NOT NULL,
+    "name" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "roles_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -44,24 +57,9 @@ CREATE TABLE "refresh_tokens" (
 );
 
 -- CreateTable
-CREATE TABLE "customers" (
-    "id" TEXT NOT NULL,
-    "email" TEXT NOT NULL,
-    "phone" TEXT NOT NULL,
-    "first_name" TEXT NOT NULL,
-    "last_name" TEXT NOT NULL,
-    "is_active" BOOLEAN NOT NULL DEFAULT true,
-    "deleted_at" TIMESTAMP(3),
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "customers_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "addresses" (
     "id" TEXT NOT NULL,
-    "customer_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "line1" TEXT NOT NULL,
@@ -185,7 +183,7 @@ CREATE TABLE "product_images" (
 -- CreateTable
 CREATE TABLE "carts" (
     "id" TEXT NOT NULL,
-    "customer_id" TEXT,
+    "user_id" TEXT,
     "session_id" TEXT,
     "last_activity_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -229,7 +227,7 @@ CREATE TABLE "coupons" (
 CREATE TABLE "orders" (
     "id" TEXT NOT NULL,
     "order_number" TEXT NOT NULL,
-    "customer_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
     "address_id" TEXT NOT NULL,
     "coupon_id" TEXT,
     "status" "OrderStatus" NOT NULL DEFAULT 'CREATED',
@@ -317,7 +315,19 @@ CREATE TABLE "audit_logs" (
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "users_phone_key" ON "users"("phone");
+
+-- CreateIndex
 CREATE INDEX "users_email_idx" ON "users"("email");
+
+-- CreateIndex
+CREATE INDEX "users_phone_idx" ON "users"("phone");
+
+-- CreateIndex
+CREATE INDEX "users_role_id_idx" ON "users"("role_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "roles_name_key" ON "roles"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "refresh_tokens_token_key" ON "refresh_tokens"("token");
@@ -329,19 +339,7 @@ CREATE INDEX "refresh_tokens_token_idx" ON "refresh_tokens"("token");
 CREATE INDEX "refresh_tokens_user_id_idx" ON "refresh_tokens"("user_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "customers_email_key" ON "customers"("email");
-
--- CreateIndex
-CREATE UNIQUE INDEX "customers_phone_key" ON "customers"("phone");
-
--- CreateIndex
-CREATE INDEX "customers_email_idx" ON "customers"("email");
-
--- CreateIndex
-CREATE INDEX "customers_phone_idx" ON "customers"("phone");
-
--- CreateIndex
-CREATE INDEX "addresses_customer_id_idx" ON "addresses"("customer_id");
+CREATE INDEX "addresses_user_id_idx" ON "addresses"("user_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "categories_name_key" ON "categories"("name");
@@ -395,7 +393,7 @@ CREATE UNIQUE INDEX "inventory_variant_id_key" ON "inventory"("variant_id");
 CREATE INDEX "product_images_product_id_idx" ON "product_images"("product_id");
 
 -- CreateIndex
-CREATE INDEX "carts_customer_id_idx" ON "carts"("customer_id");
+CREATE INDEX "carts_user_id_idx" ON "carts"("user_id");
 
 -- CreateIndex
 CREATE INDEX "carts_session_id_idx" ON "carts"("session_id");
@@ -419,7 +417,7 @@ CREATE UNIQUE INDEX "orders_order_number_key" ON "orders"("order_number");
 CREATE UNIQUE INDEX "orders_idempotency_key_key" ON "orders"("idempotency_key");
 
 -- CreateIndex
-CREATE INDEX "orders_customer_id_idx" ON "orders"("customer_id");
+CREATE INDEX "orders_user_id_idx" ON "orders"("user_id");
 
 -- CreateIndex
 CREATE INDEX "orders_status_idx" ON "orders"("status");
@@ -449,10 +447,13 @@ CREATE INDEX "audit_logs_entity_type_entity_id_idx" ON "audit_logs"("entity_type
 CREATE INDEX "audit_logs_created_at_idx" ON "audit_logs"("created_at");
 
 -- AddForeignKey
+ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "addresses" ADD CONSTRAINT "addresses_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "addresses" ADD CONSTRAINT "addresses_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "categories" ADD CONSTRAINT "categories_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "categories"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -482,7 +483,7 @@ ALTER TABLE "product_images" ADD CONSTRAINT "product_images_product_id_fkey" FOR
 ALTER TABLE "product_images" ADD CONSTRAINT "product_images_variant_id_fkey" FOREIGN KEY ("variant_id") REFERENCES "product_variants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "carts" ADD CONSTRAINT "carts_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "carts" ADD CONSTRAINT "carts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cart_items" ADD CONSTRAINT "cart_items_cart_id_fkey" FOREIGN KEY ("cart_id") REFERENCES "carts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -497,7 +498,7 @@ ALTER TABLE "orders" ADD CONSTRAINT "orders_address_id_fkey" FOREIGN KEY ("addre
 ALTER TABLE "orders" ADD CONSTRAINT "orders_coupon_id_fkey" FOREIGN KEY ("coupon_id") REFERENCES "coupons"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "orders" ADD CONSTRAINT "orders_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "orders" ADD CONSTRAINT "orders_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "order_items" ADD CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -513,3 +514,4 @@ ALTER TABLE "shipments" ADD CONSTRAINT "shipments_order_id_fkey" FOREIGN KEY ("o
 
 -- AddForeignKey
 ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+

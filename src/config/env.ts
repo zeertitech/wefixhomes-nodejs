@@ -27,6 +27,8 @@ const envSchema = z.object({
   R2_SECRET_KEY: z.string().min(1),
   R2_BUCKET: z.string().min(1),
   R2_PUBLIC_URL: z.string().min(1),
+  R2_PUBLIC_FOLDER_CATEGORY: z.string().default('categories'),
+  R2_PUBLIC_FOLDER_PRODUCT: z.string().default('products'),
 
   RAZORPAY_KEY_ID: z.string().min(1),
   RAZORPAY_KEY_SECRET: z.string().min(1),

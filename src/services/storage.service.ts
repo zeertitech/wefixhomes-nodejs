@@ -9,6 +9,7 @@ import { env } from '../config/env';
 import { BusinessError } from '../lib/errors';
 import crypto from 'crypto';
 import path from 'path';
+import slugify from 'slugify';
 
 const s3 = new S3Client({
   region: 'auto',
@@ -33,7 +34,8 @@ export class StorageService {
     buffer: Buffer,
     originalName: string,
     mimeType: string,
-    folder = 'products'
+    folder?: string,
+    prefix?: string
   ): Promise<string> {
     if (!ALLOWED_MIMES.has(mimeType)) {
       throw new BusinessError(
@@ -47,8 +49,12 @@ export class StorageService {
     }
 
     const ext = EXT_MAP[mimeType] ?? path.extname(originalName).toLowerCase();
-    const uniqueName = `${crypto.randomUUID()}${ext}`;
-    const key = `${folder}/${uniqueName}`;
+    const uniqueId = crypto.randomUUID();
+    const slug = prefix
+      ? slugify(prefix, { lower: true, strict: true, trim: true })
+      : '';
+    const uniqueName = slug ? `${slug}-${uniqueId}${ext}` : `${uniqueId}${ext}`;
+    const key = folder ? `${folder}/${uniqueName}` : uniqueName;
 
     await s3.send(
       new PutObjectCommand({
@@ -60,15 +66,21 @@ export class StorageService {
       })
     );
 
-    return `${env.R2_PUBLIC_URL}/${key}`;
+    // Return only the file name to store in DB
+    return uniqueName;
   }
 
-  async delete(url: string): Promise<void> {
-    const key = url.replace(`${env.R2_PUBLIC_URL}/`, '');
+  async delete(fileNameOrKey: string, folder?: string): Promise<void> {
+    const key = folder && !fileNameOrKey.includes('/')
+      ? `${folder}/${fileNameOrKey}`
+      : fileNameOrKey;
     await s3.send(new DeleteObjectCommand({ Bucket: env.R2_BUCKET, Key: key }));
   }
 
-  async getSignedUrl(key: string, expiresIn = 3600): Promise<string> {
+  async getSignedUrl(fileNameOrKey: string, folder?: string, expiresIn = 3600): Promise<string> {
+    const key = folder && !fileNameOrKey.includes('/')
+      ? `${folder}/${fileNameOrKey}`
+      : fileNameOrKey;
     const command = new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key });
     return getSignedUrl(s3, command, { expiresIn });
   }

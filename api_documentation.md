@@ -207,11 +207,97 @@ This document provides a comprehensive list of all available API endpoints, thei
     {
       "id": "cat_uuid",
       "name": "Ethnic Wear",
+      "imageUrl": "https://pub-xxxxxx.r2.dev/categories/xyz.webp",
       "children": [
-        { "id": "child_uuid", "name": "Sarees" }
+        { "id": "child_uuid", "name": "Sarees", "imageUrl": null }
       ]
     }
   ]
+}
+```
+
+### 3.2 Get Category by ID
+`GET /:id`
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cat_uuid",
+    "name": "Ethnic Wear",
+    "slug": "ethnic-wear",
+    "imageUrl": "https://pub-xxxxxx.r2.dev/categories/xyz.webp",
+    "description": "Traditional wear",
+    "children": []
+  }
+}
+```
+
+### 3.3 Create Category
+`POST /`
+*Auth: ADMIN required*
+
+**Payload:**
+```json
+{
+  "name": "Ethnic Wear",
+  "description": "Traditional Indian Wear",
+  "parentId": "optional_parent_cat_uuid",
+  "imageUrl": "https://pub-xxxxxx.r2.dev/categories/optional.jpg",
+  "isActive": true,
+  "sortOrder": 1
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Category created",
+  "data": {
+    "id": "cat_uuid",
+    "name": "Ethnic Wear",
+    "slug": "ethnic-wear",
+    "imageUrl": "https://pub-xxxxxx.r2.dev/categories/optional.jpg"
+  }
+}
+```
+
+### 3.4 Upload Category Image
+`POST /:id/image`
+*Auth: ADMIN required*
+*Content-Type: `multipart/form-data`*
+
+Uploads an image file to Cloudflare R2 under the configured `categories` folder, updates `category.imageUrl`, and deletes any old image previously linked.
+
+**Form Data:**
+- `file`: binary image (`.jpg`, `.png`, `.webp`)
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Category image uploaded",
+  "data": {
+    "id": "cat_uuid",
+    "name": "Ethnic Wear",
+    "imageUrl": "https://pub-xxxxxx.r2.dev/categories/uuid.webp"
+  }
+}
+```
+
+### 3.5 Delete Category Image
+`DELETE /:id/image`
+*Auth: ADMIN required*
+
+Deletes the image file from Cloudflare R2 and sets `category.imageUrl` to `null`.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Category image deleted"
 }
 ```
 

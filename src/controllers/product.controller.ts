@@ -10,6 +10,7 @@ import {
 import { sendSuccess, paginationMeta } from '../lib/response';
 import { NotFoundError } from '../lib/errors';
 import type { MultipartFile } from '@fastify/multipart';
+import { env } from '../config/env';
 
 export class ProductController {
   async list(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -70,7 +71,13 @@ export class ProductController {
       if (part.type === 'file') {
         const file = part as MultipartFile;
         const buffer = await file.toBuffer();
-        const url = await storageService.upload(buffer, file.filename, file.mimetype);
+        const fileName = await storageService.upload(
+          buffer,
+          file.filename,
+          file.mimetype,
+          env.R2_PUBLIC_FOLDER_PRODUCT,
+          product.name
+        );
 
         // First uploaded image becomes primary if none exists
         const hasExisting = await prisma.productImage.findFirst({
@@ -80,14 +87,14 @@ export class ProductController {
         await prisma.productImage.create({
           data: {
             productId: request.params.id,
-            url,
+            url: fileName,
             altText: product.name,
             isPrimary: isFirst && hasExisting === null,
             sortOrder: urls.length,
           },
         });
 
-        urls.push(url);
+        urls.push(fileName);
         isFirst = false;
       }
     }
@@ -105,7 +112,7 @@ export class ProductController {
 
     if (!image) throw new NotFoundError('Image');
 
-    await storageService.delete(image.url).catch(() => {});
+    await storageService.delete(image.url, env.R2_PUBLIC_FOLDER_PRODUCT).catch(() => {});
     await prisma.productImage.delete({ where: { id: image.id } });
 
     sendSuccess(reply, null, 'Image deleted');

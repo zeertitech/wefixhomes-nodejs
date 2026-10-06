@@ -209,7 +209,22 @@
                                                     "_postman_previewlanguage": "text"
                                                 }
                                             ],
-                                            "event": [],
+                                            "event": [
+                                                {
+                                                    "listen": "test",
+                                                    "script": {
+                                                        "exec": [
+                                                            "if (pm.response.code === 200) {",
+                                                            "    var json = pm.response.json();",
+                                                            "    if (json.data && json.data.accessToken) {",
+                                                            "        pm.environment.set(\"bearerToken\", json.data.accessToken);",
+                                                            "    }",
+                                                            "}"
+                                                        ],
+                                                        "type": "text/javascript"
+                                                    }
+                                                }
+                                            ],
                                             "protocolProfileBehavior": {
                                                 "disableBodyPruning": true
                                             }
@@ -1290,7 +1305,15 @@
                                             "variable": []
                                         },
                                         "method": "POST",
-                                        "body": {},
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": \"Festive Wear\",\n  \"description\": \"Traditional and festive wear collection\",\n  \"imageUrl\": \"https://pub-6935d22fab394f1eb9ea0d4678a6a787.r2.dev/categories/festive.jpg\",\n  \"isActive\": true,\n  \"sortOrder\": 1\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
                                         "auth": {
                                             "type": "bearer",
                                             "bearer": [
@@ -1299,7 +1322,13 @@
                                                     "value": "{{bearerToken}}"
                                                 }
                                             ]
-                                        }
+                                        },
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            }
+                                        ]
                                     },
                                     "response": [
                                         {
@@ -1616,6 +1645,91 @@
                                             "event": [],
                                             "protocolProfileBehavior": {
                                                 "disableBodyPruning": true
+                                            }
+                                        },
+                                        {
+                                            "name": "Upload category image",
+                                            "request": {
+                                                "name": "Upload category image",
+                                                "description": {},
+                                                "url": {
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "categories",
+                                                        ":id",
+                                                        "image"
+                                                    ],
+                                                    "host": [
+                                                        "{{baseUrl}}"
+                                                    ],
+                                                    "query": [],
+                                                    "variable": [
+                                                        {
+                                                            "key": "id",
+                                                            "value": "paste_category_id_here"
+                                                        }
+                                                    ]
+                                                },
+                                                "method": "POST",
+                                                "header": [],
+                                                "body": {
+                                                    "mode": "formdata",
+                                                    "formdata": [
+                                                        {
+                                                            "key": "file",
+                                                            "type": "file",
+                                                            "description": "Category image file (.jpg, .png, .webp)"
+                                                        }
+                                                    ]
+                                                },
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "{{bearerToken}}"
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        {
+                                            "name": "Delete category image",
+                                            "request": {
+                                                "name": "Delete category image",
+                                                "description": {},
+                                                "url": {
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "categories",
+                                                        ":id",
+                                                        "image"
+                                                    ],
+                                                    "host": [
+                                                        "{{baseUrl}}"
+                                                    ],
+                                                    "query": [],
+                                                    "variable": [
+                                                        {
+                                                            "key": "id",
+                                                            "value": "paste_category_id_here"
+                                                        }
+                                                    ]
+                                                },
+                                                "method": "DELETE",
+                                                "header": [],
+                                                "body": {},
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "{{bearerToken}}"
+                                                        }
+                                                    ]
+                                                }
                                             }
                                         }
                                     ]

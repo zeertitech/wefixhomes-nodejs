@@ -43,4 +43,25 @@ export async function categoryRoutes(app: FastifyInstance): Promise<void> {
     preHandler: [authenticate, authorize('ADMIN')],
     handler: categoryController.delete.bind(categoryController),
   });
+
+  app.post<{ Params: { id: string } }>('/:id/image', {
+    schema: {
+      tags: ['Categories'],
+      summary: 'Upload category image (multipart)',
+      security: [{ bearerAuth: [] }],
+      consumes: ['multipart/form-data'],
+    },
+    preHandler: [authenticate, authorize('ADMIN')],
+    handler: categoryController.uploadImage.bind(categoryController),
+  });
+
+  app.delete<{ Params: { id: string } }>('/:id/image', {
+    schema: {
+      tags: ['Categories'],
+      summary: 'Delete category image',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: [authenticate, authorize('ADMIN')],
+    handler: categoryController.deleteImage.bind(categoryController),
+  });
 }
