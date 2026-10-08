@@ -20,6 +20,10 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+  COOKIE_DOMAIN: z.string().optional(),
+  COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).optional(),
+  COOKIE_SECRET: z.string().min(16).optional(),
+
   PEPPER_SECRET: z.string().min(32, 'PEPPER_SECRET must be at least 32 characters'),
 
   R2_ACCOUNT_ID: z.string().min(1),

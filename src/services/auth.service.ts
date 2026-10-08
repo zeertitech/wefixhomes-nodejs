@@ -93,24 +93,54 @@ export class AuthService {
       include: { user: { include: { role: true } } },
     })) as { user: UserWithRole; expiresAt: Date } | null;
 
-    if (!stored || stored.expiresAt < new Date()) {
+    if (!stored) {
+      // Token not in DB — could be a replay attack. Revoke all sessions for safety.
+      let userId: string | undefined;
+      try {
+        const { verifyRefreshToken } = await import('../utils/jwt');
+        const decoded = verifyRefreshToken(token);
+        userId = decoded.userId;
+      } catch {
+        // ignore — token is malformed anyway
+      }
+      if (userId) {
+        await userRepository.deleteAllRefreshTokens(userId);
+        logger.warn('Refresh token reuse detected — all sessions revoked', { userId });
+      }
       throw new AuthError('Invalid or expired refresh token');
+    }
+
+    if (stored.expiresAt < new Date()) {
+      await userRepository.deleteRefreshToken(token);
+      throw new AuthError('Refresh token has expired. Please log in again.');
     }
 
     if (!stored.user.isActive) {
       throw new AuthError('Account is inactive');
     }
 
+    // Verify JWT signature (catches tampering even if token exists in DB)
     verifyRefreshToken(token);
 
-    const newAccessToken = signAccessToken({
+    const payload = {
       userId: stored.user.id,
       role: stored.user.role.name,
       roleId: stored.user.roleId,
       email: stored.user.email,
-    });
+    };
 
-    return { accessToken: newAccessToken };
+    // ── Token Rotation ──
+    // Issue new access + refresh tokens, revoke the old refresh token
+    const newAccessToken = signAccessToken(payload);
+    const newRefreshToken = signRefreshToken(payload);
+
+    await userRepository.deleteRefreshToken(token);
+    const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await userRepository.createRefreshToken(payload.userId, newRefreshToken, newExpiresAt);
+
+    logger.info('Token rotated via /refresh endpoint', { userId: payload.userId });
+
+    return { accessToken: newAccessToken, refreshToken: newRefreshToken };
   }
 
   async logout(userId: string, token?: string): Promise<void> {

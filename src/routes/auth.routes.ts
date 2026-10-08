@@ -40,10 +40,9 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/refresh', {
     schema: {
       tags: ['Auth'],
-      summary: 'Refresh access token',
+      summary: 'Refresh access token (via cookie or request body)',
       body: {
         type: 'object',
-        required: ['refreshToken'],
         properties: { refreshToken: { type: 'string' } },
       },
     },

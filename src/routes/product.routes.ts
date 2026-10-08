@@ -10,6 +10,16 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     handler: productController.list.bind(productController),
   });
 
+  app.get('/attributes', {
+    schema: { tags: ['Products'], summary: 'Get available color and size attributes' },
+    handler: productController.getAttributes.bind(productController),
+  });
+
+  app.get<{ Params: { id: string } }>('/id/:id', {
+    schema: { tags: ['Products'], summary: 'Get product by ID' },
+    handler: productController.getById.bind(productController),
+  });
+
   app.get<{ Params: { slug: string } }>('/:slug', {
     schema: { tags: ['Products'], summary: 'Get product by slug' },
     handler: productController.getBySlug.bind(productController),
@@ -19,7 +29,7 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
   app.post('/', {
     schema: {
       tags: ['Products'],
-      summary: 'Create product with variants',
+      summary: 'Create product with colour & sizes',
       security: [{ bearerAuth: [] }],
     },
     preHandler: [authenticate, authorize('ADMIN')],
@@ -29,17 +39,37 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string } }>('/:id', {
     schema: {
       tags: ['Products'],
-      summary: 'Update product base fields',
+      summary: 'Update product',
       security: [{ bearerAuth: [] }],
     },
     preHandler: [authenticate, authorize('ADMIN', 'STAFF')],
     handler: productController.update.bind(productController),
   });
 
+  app.post<{ Params: { id: string } }>('/:id/highlight-primary', {
+    schema: {
+      tags: ['Products'],
+      summary: 'Highlight this product as primary for its Product Group',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: [authenticate, authorize('ADMIN', 'STAFF')],
+    handler: productController.highlightPrimary.bind(productController),
+  });
+
+  app.post<{ Params: { id: string } }>('/:id/clone-colour', {
+    schema: {
+      tags: ['Products'],
+      summary: 'Add another colour to product group by cloning product details',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: [authenticate, authorize('ADMIN')],
+    handler: productController.cloneColour.bind(productController),
+  });
+
   app.delete<{ Params: { id: string } }>('/:id', {
     schema: {
       tags: ['Products'],
-      summary: 'Soft-delete a product',
+      summary: 'Delete a product (with primary auto-promotion)',
       security: [{ bearerAuth: [] }],
     },
     preHandler: [authenticate, authorize('ADMIN')],
@@ -55,6 +85,16 @@ export async function productRoutes(app: FastifyInstance): Promise<void> {
     },
     preHandler: [authenticate, authorize('ADMIN', 'STAFF')],
     handler: productController.uploadImages.bind(productController),
+  });
+
+  app.patch<{ Params: { id: string } }>('/:id/images/order', {
+    schema: {
+      tags: ['Products'],
+      summary: 'Reorder product images',
+      security: [{ bearerAuth: [] }],
+    },
+    preHandler: [authenticate, authorize('ADMIN', 'STAFF')],
+    handler: productController.reorderImages.bind(productController),
   });
 
   app.delete<{ Params: { id: string; imageId: string } }>('/:id/images/:imageId', {

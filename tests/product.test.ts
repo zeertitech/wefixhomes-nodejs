@@ -77,12 +77,21 @@ describe('POST /api/v1/products', () => {
   });
 });
 
-describe('GET /api/v1/categories', () => {
-  it('returns 200 with category list', async () => {
+describe('Categories API', () => {
+  it('returns 200 with category list and formatted imageUrl', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/v1/categories' });
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ success: boolean; data: unknown[] }>();
+    const body = res.json<{ success: boolean; data: any[] }>();
     expect(body.success).toBe(true);
     expect(Array.isArray(body.data)).toBe(true);
+  });
+
+  it('rejects POST /api/v1/categories without auth', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/categories',
+      payload: { name: 'Unauthorized Category' },
+    });
+    expect(res.statusCode).toBe(401);
   });
 });

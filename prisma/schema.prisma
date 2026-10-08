@@ -87,11 +87,15 @@ model Category {
   imageUrl    String?    @map("image_url")
   isActive    Boolean    @default(true) @map("is_active")
   sortOrder   Int        @default(0) @map("sort_order")
+  metaTitle   String?    @map("meta_title")
+  metaDescription String? @map("meta_description")
+  keywords    String[]   @default([])
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
-  parent      Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryHierarchy")
+  parent      Category?      @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[]     @relation("CategoryHierarchy")
   products    Product[]
+  productGroups ProductGroup[]
 
   @@index([slug])
   @@index([parentId])
@@ -113,34 +117,64 @@ model AttributeValue {
   value             String
   attribute         Attribute          @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   variantAttributes VariantAttribute[]
+  productsWithColor Product[]          @relation("ProductColor")
+  variantsWithSize  ProductVariant[]   @relation("VariantSize")
 
   @@unique([attributeId, value])
   @@map("attribute_values")
 }
 
-model Product {
-  id              String           @id @default(cuid())
-  categoryId      String           @map("category_id")
-  name            String
-  slug            String           @unique
-  description     String?
-  basePrice       Decimal          @map("base_price") @db.Decimal(10, 2)
-  taxRate         Decimal          @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  isActive        Boolean          @default(true) @map("is_active")
-  isFeatured      Boolean          @default(false) @map("is_featured")
-  metaTitle       String?          @map("meta_title")
-  metaDescription String?          @map("meta_description")
-  keywords        String[]
-  deletedAt       DateTime?        @map("deleted_at")
-  createdAt       DateTime         @default(now()) @map("created_at")
-  updatedAt       DateTime         @updatedAt @map("updated_at")
-  images          ProductImage[]
-  variants        ProductVariant[]
-  category        Category         @relation(fields: [categoryId], references: [id])
+model ProductGroup {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  categoryId  String    @map("category_id")
+  category    Category  @relation(fields: [categoryId], references: [id])
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  products    Product[]
 
   @@index([slug])
   @@index([categoryId])
+  @@map("product_groups")
+}
+
+model Product {
+  id               String           @id @default(cuid())
+  groupId          String           @map("group_id")
+  colorId          String           @map("color_id")
+  categoryId       String           @map("category_id")
+  name             String
+  slug             String           @unique
+  shortDescription String?          @map("short_description")
+  description      String?
+  basePrice        Decimal          @map("base_price") @db.Decimal(10, 2)
+  comparePrice     Decimal?         @map("compare_price") @db.Decimal(10, 2)
+  taxRate          Decimal          @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  isPrimary        Boolean          @default(false) @map("is_primary")
+  isActive         Boolean          @default(true) @map("is_active")
+  isFeatured       Boolean          @default(false) @map("is_featured")
+  metaTitle        String?          @map("meta_title")
+  metaDescription  String?          @map("meta_description")
+  keywords         String[]         @default([])
+  deletedAt        DateTime?        @map("deleted_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  group            ProductGroup     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  color            AttributeValue   @relation("ProductColor", fields: [colorId], references: [id])
+  category         Category         @relation(fields: [categoryId], references: [id])
+  images           ProductImage[]
+  variants         ProductVariant[]
+
+  @@unique([groupId, colorId])
+  @@index([groupId])
+  @@index([colorId])
+  @@index([slug])
+  @@index([categoryId])
   @@index([isActive])
+  @@index([isPrimary])
   @@index([deletedAt])
   @@map("products")
 }
@@ -148,6 +182,7 @@ model Product {
 model ProductVariant {
   id           String             @id @default(cuid())
   productId    String             @map("product_id")
+  sizeId       String             @map("size_id")
   sku          String             @unique
   price        Decimal            @db.Decimal(10, 2)
   comparePrice Decimal?           @map("compare_price") @db.Decimal(10, 2)
@@ -160,9 +195,12 @@ model ProductVariant {
   orderItems   OrderItem[]
   images       ProductImage[]
   product      Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  size         AttributeValue     @relation("VariantSize", fields: [sizeId], references: [id])
   attributes   VariantAttribute[]
 
+  @@unique([productId, sizeId])
   @@index([productId])
+  @@index([sizeId])
   @@index([sku])
   @@map("product_variants")
 }

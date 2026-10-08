@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import multipart from '@fastify/multipart';
@@ -40,6 +41,11 @@ export async function setupPlugins(app: FastifyInstance) {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Idempotency-Key'],
     credentials: true,
+  });
+
+  // ── Cookies ───────────────────────────────────────────────
+  await app.register(cookie, {
+    secret: env.COOKIE_SECRET ?? env.JWT_SECRET,
   });
 
   // ── Rate limiting ────────────────────────────────────────

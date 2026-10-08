@@ -124,6 +124,9 @@ export class OrderService {
       await tx.cartItem.deleteMany({ where: { cartId: input.cartId } });
 
       return created;
+    }, {
+      maxWait: 10000,
+      timeout: 30000,
     });
 
     await auditService.log('order', order.id, 'CREATE', null, { orderNumber: order.orderNumber, total: order.total }, adminId);
