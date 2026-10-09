@@ -150,8 +150,11 @@ export class CategoryController {
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ): Promise<void> {
-    const category = await prisma.category.findUnique({
-      where: { id: request.params.id },
+    const identifier = request.params.id;
+    const category = await prisma.category.findFirst({
+      where: {
+        OR: [{ id: identifier }, { slug: identifier }],
+      },
       include: { children: true, parent: true },
     });
     if (!category) throw new NotFoundError('Category');

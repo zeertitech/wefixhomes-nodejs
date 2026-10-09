@@ -9,6 +9,14 @@ export class ProductRepository {
     const where: Prisma.ProductWhereInput = {
       deletedAt: null,
       ...(filters.categoryId !== undefined && { categoryId: filters.categoryId }),
+      ...(filters.categorySlug !== undefined && {
+        category: {
+          OR: [
+            { slug: filters.categorySlug },
+            { parent: { slug: filters.categorySlug } },
+          ],
+        },
+      }),
       ...(filters.groupId !== undefined && { groupId: filters.groupId }),
       ...(filters.colorId !== undefined && { colorId: filters.colorId }),
       ...(filters.isActive !== undefined && { isActive: filters.isActive }),

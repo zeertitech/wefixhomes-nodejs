@@ -85,6 +85,7 @@ export const reorderImagesSchema = z.object({
 
 export const productFilterSchema = paginationSchema.extend({
   categoryId: z.string().optional(),
+  categorySlug: z.string().optional(),
   groupId: z.string().optional(),
   colorId: z.string().optional(),
   minPrice: z.coerce.number().positive().optional(),

@@ -68,7 +68,7 @@ function parseDurationToSeconds(duration: string, fallbackSeconds: number): numb
  *    Enables the session cookie across all API routes.
  */
 export function getCookieOptions(type: 'access' | 'refresh'): CookieOptions {
-  const isProduction = env.NODE_ENV === 'production';
+  const isProduction = env.NODE_ENV === 'production' || !!env.COOKIE_DOMAIN;
   const secure = isProduction;
 
   let sameSite: 'lax' | 'strict' | 'none' = 'lax';
@@ -84,7 +84,13 @@ export function getCookieOptions(type: 'access' | 'refresh'): CookieOptions {
     sameSite = 'lax';
   }
 
-  const domain = isProduction && env.COOKIE_DOMAIN ? env.COOKIE_DOMAIN : undefined;
+  // Multi-subdomain cookie: e.g. '.shanandra.in' allows both www.shanandra.in and api.shanandra.in
+  let domain: string | undefined = undefined;
+  if (isProduction && env.COOKIE_DOMAIN) {
+    domain = env.COOKIE_DOMAIN.startsWith('.')
+      ? env.COOKIE_DOMAIN
+      : `.${env.COOKIE_DOMAIN}`;
+  }
 
   const maxAge =
     type === 'access'
