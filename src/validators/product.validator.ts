@@ -96,9 +96,51 @@ export const productFilterSchema = paginationSchema.extend({
   search: z.string().max(100).optional(),
 });
 
+export const publicProductFilterSchema = paginationSchema.extend({
+  category: z.string().optional(),
+  categorySlug: z.string().optional(),
+  categoryId: z.string().optional(),
+  subCategory: z.string().optional(),
+  subCategorySlug: z.string().optional(),
+  groupId: z.string().optional(),
+  colorId: z.string().optional(),
+  colors: z
+    .union([z.array(z.string()), z.string()])
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      if (Array.isArray(val)) return val.map((s) => s.trim()).filter(Boolean);
+      return val.split(',').map((s) => s.trim()).filter(Boolean);
+    }),
+  color: z.string().optional(),
+  sizes: z
+    .union([z.array(z.string()), z.string()])
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      if (Array.isArray(val)) return val.map((s) => s.trim()).filter(Boolean);
+      return val.split(',').map((s) => s.trim()).filter(Boolean);
+    }),
+  size: z.string().optional(),
+  minPrice: z.coerce.number().min(0).optional(),
+  maxPrice: z.coerce.number().min(0).optional(),
+  isFeatured: z.coerce.boolean().optional(),
+  isPrimary: z.coerce.boolean().optional(),
+  search: z.string().max(100).optional(),
+  includeFacets: z.coerce.boolean().optional(),
+});
+
+export const publicProductFacetFilterSchema = z.object({
+  category: z.string().optional(),
+  categorySlug: z.string().optional(),
+});
+
 export type ProductSizeInput = z.infer<typeof productSizeInputSchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type CloneColourInput = z.infer<typeof cloneColourSchema>;
 export type ReorderImagesInput = z.infer<typeof reorderImagesSchema>;
 export type ProductFilterInput = z.infer<typeof productFilterSchema>;
+export type PublicProductFilterInput = z.infer<typeof publicProductFilterSchema>;
+export type PublicProductFacetFilterInput = z.infer<typeof publicProductFacetFilterSchema>;
+

@@ -115,12 +115,17 @@ model AttributeValue {
   id                String             @id @default(cuid())
   attributeId       String             @map("attribute_id")
   value             String
+  colorCode         String?            @map("color_code")
+  sortOrder         Int                @default(0) @map("sort_order")
+  orderList         Int?               @map("order_list")
   attribute         Attribute          @relation(fields: [attributeId], references: [id], onDelete: Cascade)
   variantAttributes VariantAttribute[]
   productsWithColor Product[]          @relation("ProductColor")
   variantsWithSize  ProductVariant[]   @relation("VariantSize")
 
   @@unique([attributeId, value])
+  @@index([attributeId])
+  @@index([sortOrder])
   @@map("attribute_values")
 }
 
@@ -144,6 +149,7 @@ model Product {
   id               String           @id @default(cuid())
   groupId          String           @map("group_id")
   colorId          String           @map("color_id")
+  colorCode        String?          @map("color_code")
   categoryId       String           @map("category_id")
   name             String
   slug             String           @unique
@@ -186,6 +192,8 @@ model ProductVariant {
   sku          String             @unique
   price        Decimal            @db.Decimal(10, 2)
   comparePrice Decimal?           @map("compare_price") @db.Decimal(10, 2)
+  sortOrder    Int                @default(0) @map("sort_order")
+  orderList    Int?               @map("order_list")
   isActive     Boolean            @default(true) @map("is_active")
   deletedAt    DateTime?          @map("deleted_at")
   createdAt    DateTime           @default(now()) @map("created_at")
@@ -202,6 +210,7 @@ model ProductVariant {
   @@index([productId])
   @@index([sizeId])
   @@index([sku])
+  @@index([sortOrder])
   @@map("product_variants")
 }
 

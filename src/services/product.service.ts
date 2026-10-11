@@ -11,6 +11,7 @@ import type {
   CloneColourInput,
   ReorderImagesInput,
   ProductFilterInput,
+  PublicProductFilterInput,
 } from '../validators/product.validator';
 
 async function makeUniqueSlug(name: string): Promise<string> {
@@ -36,6 +37,44 @@ export class ProductService {
     const result = await productRepository.findMany(filters);
     cache.set(cacheKey, result, 30);
     return result;
+  }
+
+  async listPublic(filters: PublicProductFilterInput) {
+    const cacheKey = `products:public:list:${JSON.stringify(filters)}`;
+    const cached = cache.get<{ items: unknown[]; total: number; facets?: unknown }>(cacheKey);
+    if (cached !== null) return cached;
+
+    const result = await productRepository.findPublicProducts(filters);
+
+    let facets: unknown = undefined;
+    if (filters.includeFacets) {
+      const catQuery =
+        filters.subCategorySlug ||
+        filters.subCategory ||
+        filters.categorySlug ||
+        filters.category ||
+        filters.categoryId;
+      facets = await productRepository.getPublicProductFilters(catQuery);
+    }
+
+    const payload = {
+      items: result.items,
+      total: result.total,
+      ...(facets !== undefined ? { facets } : {}),
+    };
+
+    cache.set(cacheKey, payload, 30);
+    return payload;
+  }
+
+  async getPublicFilters(categoryIdentifier?: string) {
+    const cacheKey = `products:public:filters:${categoryIdentifier || 'all'}`;
+    const cached = cache.get<unknown>(cacheKey);
+    if (cached !== null) return cached;
+
+    const filters = await productRepository.getPublicProductFilters(categoryIdentifier);
+    cache.set(cacheKey, filters, 60);
+    return filters;
   }
 
   async getBySlug(slug: string) {
@@ -78,6 +117,7 @@ export class ProductService {
       throw new BusinessError('One or more selected sizes are invalid');
     }
     const sizeMap = new Map(existingSizes.map((s) => [s.id, s.value]));
+    const sizeOrderMap = new Map(existingSizes.map((s) => [s.id, s.sortOrder]));
 
     const productSlug = await makeUniqueSlug(input.name);
     const groupSlug = !input.groupId
@@ -136,6 +176,7 @@ export class ProductService {
           data: {
             groupId,
             colorId: input.colorId,
+            colorCode: color.colorCode,
             categoryId: input.categoryId,
             name: input.name,
             slug: productSlug,
@@ -153,6 +194,7 @@ export class ProductService {
             variants: {
               create: input.sizes.map((s) => {
                 const sizeVal = sizeMap.get(s.sizeId) || 'SIZE';
+                const sortOrder = sizeOrderMap.get(s.sizeId) ?? 0;
                 const rawSku =
                   s.sku ||
                   `${productSlug.substring(0, 12).toUpperCase()}-${sizeVal.toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
@@ -162,6 +204,8 @@ export class ProductService {
                   sku: rawSku,
                   price: s.price,
                   comparePrice: s.comparePrice ?? input.comparePrice,
+                  sortOrder,
+                  orderList: sortOrder,
                   isActive: true,
                   inventory: {
                     create: {
@@ -372,6 +416,11 @@ export class ProductService {
     const newName = input.name || `${groupName} — ${color.value}`;
     const newSlug = await makeUniqueSlug(newName);
 
+    const allSizes = await prisma.attributeValue.findMany({
+      where: { attribute: { name: 'Size' } },
+    });
+    const sizeOrderMap = new Map(allSizes.map((s) => [s.id, s.sortOrder]));
+
     const cloned = await prisma.$transaction(
       async (tx) => {
         // Sizes: use input.sizes if provided, otherwise duplicate from source
@@ -389,6 +438,7 @@ export class ProductService {
           data: {
             groupId: source.groupId,
             colorId: input.colorId,
+            colorCode: color.colorCode,
             categoryId: source.categoryId,
             name: newName,
             slug: newSlug,
@@ -404,18 +454,23 @@ export class ProductService {
             metaDescription: source.metaDescription,
             keywords: source.keywords,
             variants: {
-              create: sizesToCreate.map((s) => ({
-                sizeId: s.sizeId,
-                sku: `${newSlug.substring(0, 12).toUpperCase()}-SIZE-${crypto.randomBytes(2).toString('hex').toUpperCase()}`,
-                price: s.price,
-                comparePrice: s.comparePrice,
-                isActive: true,
-                inventory: {
-                  create: {
-                    quantity: s.stock,
+              create: sizesToCreate.map((s) => {
+                const sortOrder = sizeOrderMap.get(s.sizeId) ?? 0;
+                return {
+                  sizeId: s.sizeId,
+                  sku: `${newSlug.substring(0, 12).toUpperCase()}-SIZE-${crypto.randomBytes(2).toString('hex').toUpperCase()}`,
+                  price: s.price,
+                  comparePrice: s.comparePrice,
+                  sortOrder,
+                  orderList: sortOrder,
+                  isActive: true,
+                  inventory: {
+                    create: {
+                      quantity: s.stock,
+                    },
                   },
-                },
-              })),
+                };
+              }),
             },
           },
         });
