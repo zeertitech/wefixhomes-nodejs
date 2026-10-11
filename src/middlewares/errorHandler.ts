@@ -8,17 +8,26 @@ export function errorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ): void {
-  // Always log the error
+  // Log error based on severity
   const isOperational = error instanceof AppError && error.statusCode < 500;
   const showStack = process.env['NODE_ENV'] === 'development' && !isOperational;
 
-  logger.error('Request error', {
-    url: request.url,
-    method: request.method,
-    errorName: error.name,
-    message: error.message,
-    stack: showStack ? error.stack : undefined,
-  });
+  if (isOperational) {
+    logger.warn('Client request warning', {
+      url: request.url,
+      method: request.method,
+      errorName: error.name,
+      message: error.message,
+    });
+  } else {
+    logger.error('Request error', {
+      url: request.url,
+      method: request.method,
+      errorName: error.name,
+      message: error.message,
+      stack: showStack ? error.stack : undefined,
+    });
+  }
 
   // Zod validation errors
   if (error instanceof ZodError) {

@@ -15,6 +15,7 @@ import { systemRoutes } from './routes/system.routes';
 import { authRoutes } from './routes/auth.routes';
 import { productRoutes } from './routes/product.routes';
 import { categoryRoutes } from './routes/category.routes';
+import { publicCategoryRoutes } from './routes/public-category.routes';
 import { cartRoutes } from './routes/cart.routes';
 import { orderRoutes } from './routes/order.routes';
 import { paymentRoutes } from './routes/payment.routes';
@@ -97,6 +98,7 @@ export async function setupPlugins(app: FastifyInstance) {
         { name: 'Auth', description: 'Authentication & session management' },
         { name: 'Products', description: 'Product & variant management' },
         { name: 'Categories', description: 'Category hierarchy management' },
+        { name: 'Public Categories', description: 'Public storefront category endpoints' },
         { name: 'Users', description: 'User & address management' },
         { name: 'Cart', description: 'Shopping cart (guest + authenticated)' },
         { name: 'Orders', description: 'Order lifecycle management' },
@@ -129,12 +131,13 @@ export async function setupRoutes(app: FastifyInstance) {
   // ── API routes ────────────────────────────────────────────
   const prefix = env.API_PREFIX;
 
-  await app.register(authRoutes,      { prefix: `${prefix}/auth` });
-  await app.register(productRoutes,   { prefix: `${prefix}/products` });
-  await app.register(categoryRoutes,  { prefix: `${prefix}/categories` });
-  await app.register(cartRoutes,      { prefix: `${prefix}/cart` });
-  await app.register(orderRoutes,     { prefix: `${prefix}/orders` });
-  await app.register(paymentRoutes,   { prefix: `${prefix}/payments` });
-  await app.register(shipmentRoutes,  { prefix: `${prefix}/shipments` });
-  await app.register(inventoryRoutes, { prefix: `${prefix}/inventory` });
+  await app.register(authRoutes,            { prefix: `${prefix}/auth` });
+  await app.register(productRoutes,         { prefix: `${prefix}/products` });
+  await app.register(categoryRoutes,        { prefix: `${prefix}/categories` });
+  await app.register(publicCategoryRoutes,  { prefix: `${prefix}/public/categories` });
+  await app.register(cartRoutes,            { prefix: `${prefix}/cart` });
+  await app.register(orderRoutes,           { prefix: `${prefix}/orders` });
+  await app.register(paymentRoutes,         { prefix: `${prefix}/payments` });
+  await app.register(shipmentRoutes,        { prefix: `${prefix}/shipments` });
+  await app.register(inventoryRoutes,       { prefix: `${prefix}/inventory` });
 }

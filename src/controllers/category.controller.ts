@@ -72,18 +72,109 @@ async function createUniqueSlug(baseText: string): Promise<string> {
 
 function formatCategoryImageUrl(imageUrl: string | null | undefined): string | null {
   if (!imageUrl || !imageUrl.trim()) return null;
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) {
+    return imageUrl;
+  }
   const fileName = imageUrl.includes('/') ? imageUrl.split('/').pop()! : imageUrl;
   const baseUrl = env.R2_PUBLIC_URL.replace(/\/+$/, '');
   const folder = env.R2_PUBLIC_FOLDER_CATEGORY.replace(/^\/+|\/+$/g, '');
   return `${baseUrl}/${folder}/${fileName}`;
 }
 
-function formatCategory<T extends { imageUrl?: string | null; children?: any[]; parent?: any }>(
+function formatProductImageUrl(imageUrl: string | null | undefined): string | null {
+  if (!imageUrl || !imageUrl.trim()) return null;
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://') || imageUrl.startsWith('/')) return imageUrl;
+  const fileName = imageUrl.includes('/') ? imageUrl.split('/').pop()! : imageUrl;
+  const baseUrl = env.R2_PUBLIC_URL.replace(/\/+$/, '');
+  const folder = env.R2_PUBLIC_FOLDER_PRODUCT.replace(/^\/+|\/+$/g, '');
+  return `${baseUrl}/${folder}/${fileName}`;
+}
+
+function resolveCategoryImageUrl(category: {
+  imageUrl?: string | null;
+  products?: Array<{ images?: Array<{ url: string }> }>;
+}): string | null {
+  let resolvedImageUrl = formatCategoryImageUrl(category.imageUrl);
+  if (!resolvedImageUrl && category.products && category.products.length > 0) {
+    const firstProduct = category.products[0];
+    if (firstProduct?.images && firstProduct.images.length > 0) {
+      resolvedImageUrl = formatProductImageUrl(firstProduct.images[0].url);
+    }
+  }
+  return resolvedImageUrl;
+}
+
+export interface PublicCategoryItem {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  parentId: string | null;
+  imageUrl: string | null;
+  sortOrder: number;
+  products: number;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  children: PublicCategoryItem[];
+}
+
+function buildPublicCategoryHierarchy(allCategories: any[]): {
+  categoryMap: Map<string, PublicCategoryItem>;
+  rootCategories: PublicCategoryItem[];
+} {
+  const categoryMap = new Map<string, PublicCategoryItem>();
+
+  allCategories.forEach((cat) => {
+    categoryMap.set(cat.id, {
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      description: cat.description ?? null,
+      parentId: cat.parentId ?? null,
+      imageUrl: resolveCategoryImageUrl(cat),
+      sortOrder: cat.sortOrder,
+      products: cat._count?.products ?? (typeof cat.products === 'number' ? cat.products : 0),
+      metaTitle: cat.metaTitle ?? null,
+      metaDescription: cat.metaDescription ?? null,
+      children: [],
+    });
+  });
+
+  const rootCategories: PublicCategoryItem[] = [];
+  allCategories.forEach((cat) => {
+    const formatted = categoryMap.get(cat.id)!;
+    if (cat.parentId && categoryMap.has(cat.parentId)) {
+      categoryMap.get(cat.parentId)!.children.push(formatted);
+    } else {
+      rootCategories.push(formatted);
+    }
+  });
+
+  // Roll up product counts: each parent category includes its direct products + all descendants' products recursively
+  function rollupProductCounts(node: PublicCategoryItem): number {
+    let total = node.products;
+    for (const child of node.children) {
+      total += rollupProductCounts(child);
+    }
+    node.products = total;
+    return total;
+  }
+
+  rootCategories.forEach((root) => rollupProductCounts(root));
+
+  return { categoryMap, rootCategories };
+}
+
+function formatCategory<T extends { imageUrl?: string | null; children?: any[]; parent?: any; products?: any[] }>(
   category: T
 ): T {
+  const resolvedImageUrl = resolveCategoryImageUrl(category);
+
+  const { products, ...rest } = category as any;
+
   return {
-    ...category,
-    imageUrl: formatCategoryImageUrl(category.imageUrl),
+    ...rest,
+    imageUrl: resolvedImageUrl,
     ...(category.children
       ? { children: category.children.map((child: any) => formatCategory(child)) }
       : {}),
@@ -110,6 +201,17 @@ export class CategoryController {
             orderBy: { sortOrder: 'asc' },
           },
           _count: { select: { products: true } },
+          products: {
+            where: { isActive: true },
+            take: 1,
+            select: {
+              images: {
+                take: 1,
+                orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+                select: { url: true },
+              },
+            },
+          },
         },
       });
       sendSuccess(reply, categories.map((cat) => formatCategory(cat)), 'Categories fetched');
@@ -122,6 +224,17 @@ export class CategoryController {
       orderBy: { sortOrder: 'asc' },
       include: {
         _count: { select: { products: true } },
+        products: {
+          where: { isActive: true },
+          take: 1,
+          select: {
+            images: {
+              take: 1,
+              orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+              select: { url: true },
+            },
+          },
+        },
       },
     });
 
@@ -153,12 +266,114 @@ export class CategoryController {
     const identifier = request.params.id;
     const category = await prisma.category.findFirst({
       where: {
-        OR: [{ id: identifier }, { slug: identifier }],
+        OR: [
+          { id: identifier },
+          { slug: identifier },
+          ...(identifier === 'women' ? [{ slug: 'womens-wear' }] : []),
+          ...(identifier === 'men' ? [{ slug: 'mens-wear' }] : []),
+          ...(identifier === 'kids' ? [{ slug: 'kids-festive' }] : []),
+        ],
       },
-      include: { children: true, parent: true },
+      include: {
+        children: {
+          where: { isActive: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+        parent: true,
+      },
     });
     if (!category) throw new NotFoundError('Category');
     sendSuccess(reply, formatCategory(category), 'Category fetched');
+  }
+
+  async publicList(
+    request: FastifyRequest<{ Querystring: { nested?: string; tree?: string } }>,
+    reply: FastifyReply
+  ): Promise<void> {
+    const { nested, tree } = (request.query || {}) as { nested?: string; tree?: string };
+    const isNested = nested === 'true' || nested === '1' || tree === 'true' || tree === '1';
+
+    const allCategories = await prisma.category.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        _count: { select: { products: true } },
+        products: {
+          where: { isActive: true },
+          take: 1,
+          select: {
+            images: {
+              take: 1,
+              orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+              select: { url: true },
+            },
+          },
+        },
+      },
+    });
+
+    const { categoryMap, rootCategories } = buildPublicCategoryHierarchy(allCategories);
+
+    reply.header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+
+    if (!isNested) {
+      const flatList = allCategories.map((cat) => {
+        const item = categoryMap.get(cat.id)!;
+        return {
+          ...item,
+          children: item.children.map((c) => ({ ...c, children: [] })),
+        };
+      });
+      sendSuccess(reply, flatList, 'Public categories fetched');
+      return;
+    }
+
+    sendSuccess(reply, rootCategories, 'Nested public categories fetched');
+  }
+
+  async publicGetById(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply
+  ): Promise<void> {
+    reply.header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+    const identifier = request.params.id;
+
+    const allCategories = await prisma.category.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        _count: { select: { products: true } },
+        products: {
+          where: { isActive: true },
+          take: 1,
+          select: {
+            images: {
+              take: 1,
+              orderBy: [{ isPrimary: 'desc' }, { sortOrder: 'asc' }],
+              select: { url: true },
+            },
+          },
+        },
+      },
+    });
+
+    const { categoryMap } = buildPublicCategoryHierarchy(allCategories);
+
+    const targetCategory = allCategories.find(
+      (cat) =>
+        cat.id === identifier ||
+        cat.slug === identifier ||
+        (identifier === 'women' && (cat.slug === 'womens-wear' || cat.slug === 'women')) ||
+        (identifier === 'men' && (cat.slug === 'mens-wear' || cat.slug === 'men')) ||
+        (identifier === 'kids' && (cat.slug === 'kids-festive' || cat.slug === 'kids'))
+    );
+
+    if (!targetCategory) throw new NotFoundError('Category');
+
+    const result = categoryMap.get(targetCategory.id);
+    if (!result) throw new NotFoundError('Category');
+
+    sendSuccess(reply, result, 'Public category fetched');
   }
 
   async create(request: FastifyRequest, reply: FastifyReply): Promise<void> {
