@@ -39,15 +39,45 @@ export function formatPublicProduct(product: any): any {
       ? Math.round(((comparePriceNum - basePriceNum) / comparePriceNum) * 100)
       : 0;
 
+  const variants = (product.variants || []).map((v: any) => ({
+    ...v,
+    price: Number(v.price) || 0,
+    comparePrice: v.comparePrice != null ? Number(v.comparePrice) : null,
+    inventory: v.inventory
+      ? {
+          quantity: v.inventory.quantity ?? 0,
+          lowStockAt: v.inventory.lowStockAt ?? 5,
+        }
+      : null,
+  }));
+
+  const currentMinVariantPrice =
+    variants.length > 0 ? Math.min(...variants.map((v: any) => v.price)) : null;
+
   // Format sibling colors from product group
   let siblingColors: any[] = [];
   if (product.group?.products && Array.isArray(product.group.products)) {
     siblingColors = product.group.products.map((gp: any) => {
       const gpImg = gp.images?.[0]?.url ? formatProductImageUrl(gp.images[0].url) : null;
+      const gpBasePrice = gp.basePrice != null ? Number(gp.basePrice) : null;
+      const gpComparePrice = gp.comparePrice != null ? Number(gp.comparePrice) : null;
+      const gpVariants = (gp.variants || []).map((v: any) => ({
+        ...v,
+        price: Number(v.price) || 0,
+        comparePrice: v.comparePrice != null ? Number(v.comparePrice) : null,
+      }));
+      const minVariantPrice =
+        gpVariants.length > 0 ? Math.min(...gpVariants.map((v: any) => v.price)) : null;
+      const effectivePrice = minVariantPrice ?? gpBasePrice;
+
       return {
         productId: gp.id,
         name: gp.name,
         slug: gp.slug,
+        basePrice: gpBasePrice,
+        comparePrice: gpComparePrice,
+        price: effectivePrice,
+        variants: gpVariants,
         colorId: gp.color?.id || null,
         colorName: gp.color?.value || null,
         colorCode: gp.colorCode || gp.color?.colorCode || null,
@@ -65,6 +95,10 @@ export function formatPublicProduct(product: any): any {
         productId: product.id,
         name: product.name,
         slug: product.slug,
+        basePrice: basePriceNum,
+        comparePrice: comparePriceNum,
+        price: currentMinVariantPrice ?? basePriceNum,
+        variants,
         colorId: product.color.id,
         colorName: product.color.value,
         colorCode: product.colorCode || product.color.colorCode || null,
@@ -74,18 +108,6 @@ export function formatPublicProduct(product: any): any {
       },
     ];
   }
-
-  const variants = (product.variants || []).map((v: any) => ({
-    ...v,
-    price: Number(v.price) || 0,
-    comparePrice: v.comparePrice != null ? Number(v.comparePrice) : null,
-    inventory: v.inventory
-      ? {
-          quantity: v.inventory.quantity ?? 0,
-          lowStockAt: v.inventory.lowStockAt ?? 5,
-        }
-      : null,
-  }));
 
   const uniqueSizes = Array.from(
     new Set(
