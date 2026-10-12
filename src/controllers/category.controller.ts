@@ -287,11 +287,12 @@ export class CategoryController {
   }
 
   async publicList(
-    request: FastifyRequest<{ Querystring: { nested?: string; tree?: string } }>,
+    request: FastifyRequest<{ Querystring: { nested?: string; tree?: string; topLevel?: string } }>,
     reply: FastifyReply
   ): Promise<void> {
-    const { nested, tree } = (request.query || {}) as { nested?: string; tree?: string };
+    const { nested, tree, topLevel } = (request.query || {}) as { nested?: string; tree?: string; topLevel?: string };
     const isNested = nested === 'true' || nested === '1' || tree === 'true' || tree === '1';
+    const isTopLevelOnly = topLevel === 'true' || topLevel === '1';
 
     const allCategories = await prisma.category.findMany({
       where: { isActive: true },
@@ -315,6 +316,16 @@ export class CategoryController {
     const { categoryMap, rootCategories } = buildPublicCategoryHierarchy(allCategories);
 
     reply.header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
+
+    if (isTopLevelOnly) {
+      // Return only root-level categories with their direct children (no deep nesting)
+      const topLevelList = rootCategories.map((cat) => ({
+        ...cat,
+        children: cat.children.map((c) => ({ ...c, children: [] })),
+      }));
+      sendSuccess(reply, topLevelList, 'Top-level public categories fetched');
+      return;
+    }
 
     if (!isNested) {
       const flatList = allCategories.map((cat) => {

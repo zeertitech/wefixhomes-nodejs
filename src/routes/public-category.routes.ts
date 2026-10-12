@@ -11,6 +11,7 @@ export async function publicCategoryRoutes(app: FastifyInstance): Promise<void> 
         properties: {
           nested: { type: 'string', description: 'Pass "true" to return tree hierarchy' },
           tree: { type: 'string', description: 'Alias for nested' },
+          topLevel: { type: 'string', description: 'Pass "true" to return only root categories (parentId = null)' },
         },
       },
     },
