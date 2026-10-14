@@ -4,7 +4,11 @@ import { env } from '../config/env';
 export const COOKIE_NAMES = {
   ACCESS_TOKEN: 'accessToken',
   REFRESH_TOKEN: 'refreshToken',
+  /** httpOnly guest cart key. Never accepted from query or body. */
+  CART_SESSION: 'cartSession',
 } as const;
+
+const CART_SESSION_MAX_AGE = 30 * 24 * 60 * 60;
 
 export interface CookieOptions {
   httpOnly: boolean;
@@ -145,6 +149,17 @@ export function clearAuthCookies(reply: FastifyReply): void {
 /**
  * Retrieves authentication tokens from incoming request cookies.
  */
+/**
+ * Guest cart identity. httpOnly so page scripts cannot read or forge another shopper's bag.
+ */
+export function setCartSessionCookie(reply: FastifyReply, sessionId: string): void {
+  const base = getCookieOptions('refresh');
+  reply.setCookie(COOKIE_NAMES.CART_SESSION, sessionId, {
+    ...base,
+    maxAge: CART_SESSION_MAX_AGE,
+  });
+}
+
 export function getAuthCookies(request: FastifyRequest): {
   accessToken?: string;
   refreshToken?: string;

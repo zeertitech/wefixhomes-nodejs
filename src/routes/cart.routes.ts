@@ -1,20 +1,23 @@
 import { FastifyInstance } from 'fastify';
 import { cartController } from '../controllers/cart.controller';
+import { authenticate, optionalAuthenticate } from '../middlewares/authenticate';
 
 export async function cartRoutes(app: FastifyInstance): Promise<void> {
   app.get('/', {
     schema: {
       tags: ['Cart'],
-      summary: 'Get or create cart',
-      description: 'Pass ?userId=xxx for logged-in users or ?sessionId=xxx for guests',
+      summary: 'Get or create the current cart',
+      description:
+        'Logged-in shoppers are resolved from the session cookie. Guests receive an httpOnly cart session. Client-supplied user or cart ids are ignored.',
     },
+    preHandler: [optionalAuthenticate],
     handler: cartController.getCart.bind(cartController),
   });
 
-  app.post('/:cartId/items', {
+  app.post('/items', {
     schema: {
       tags: ['Cart'],
-      summary: 'Add item to cart',
+      summary: 'Add item to the current cart',
       body: {
         type: 'object',
         required: ['variantId', 'quantity'],
@@ -24,13 +27,14 @@ export async function cartRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
+    preHandler: [optionalAuthenticate],
     handler: cartController.addItem.bind(cartController),
   });
 
-  app.patch('/:cartId/items/:variantId', {
+  app.patch<{ Params: { variantId: string } }>('/items/:variantId', {
     schema: {
       tags: ['Cart'],
-      summary: 'Update item quantity (set to 0 to remove)',
+      summary: 'Set item quantity on the current cart (0 removes it)',
       body: {
         type: 'object',
         required: ['quantity'],
@@ -39,27 +43,23 @@ export async function cartRoutes(app: FastifyInstance): Promise<void> {
         },
       },
     },
+    preHandler: [optionalAuthenticate],
     handler: cartController.updateItem.bind(cartController),
   });
 
-  app.delete('/:cartId/items/:variantId', {
-    schema: { tags: ['Cart'], summary: 'Remove item from cart' },
+  app.delete<{ Params: { variantId: string } }>('/items/:variantId', {
+    schema: { tags: ['Cart'], summary: 'Remove item from the current cart' },
+    preHandler: [optionalAuthenticate],
     handler: cartController.removeItem.bind(cartController),
   });
 
   app.post('/merge', {
     schema: {
       tags: ['Cart'],
-      summary: 'Merge guest cart into user cart after login',
-      body: {
-        type: 'object',
-        required: ['sessionId', 'userId'],
-        properties: {
-          sessionId: { type: 'string' },
-          userId: { type: 'string' },
-        },
-      },
+      summary: 'Merge the guest cart cookie into the logged-in shopper cart',
+      security: [{ bearerAuth: [] }],
     },
+    preHandler: [authenticate],
     handler: cartController.merge.bind(cartController),
   });
 }

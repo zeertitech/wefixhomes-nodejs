@@ -1,63 +1,48 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { FastifyReply, FastifyRequest } from 'fastify';
 import { cartService } from '../services/cart.service';
-import {
-  addToCartSchema,
-  updateCartItemSchema,
-  mergeCartSchema,
-} from '../validators/cart.validator';
+import { addToCartSchema, updateCartItemSchema } from '../validators/cart.validator';
 import { sendSuccess } from '../lib/response';
+import { COOKIE_NAMES } from '../utils/cookie';
 
 export class CartController {
-  async getCart(
-    request: FastifyRequest<{
-      Querystring: { userId?: string; sessionId?: string };
-    }>,
-    reply: FastifyReply
-  ): Promise<void> {
-    const cart = await cartService.getOrCreateCart(
-      request.query.userId,
-      request.query.sessionId
-    );
+  async getCart(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const cart = await cartService.resolveForRequest(request, reply);
     sendSuccess(reply, cart, 'Cart fetched');
   }
 
-  async addItem(
-    request: FastifyRequest<{ Params: { cartId: string } }>,
-    reply: FastifyReply
-  ): Promise<void> {
+  async addItem(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const input = addToCartSchema.parse(request.body);
-    const cart = await cartService.addItem(request.params.cartId, input);
-    sendSuccess(reply, cart, 'Item added to cart');
+    const cart = await cartService.resolveForRequest(request, reply);
+    const updated = await cartService.addItem(cart.id, input);
+    sendSuccess(reply, updated, 'Item added to cart');
   }
 
   async updateItem(
-    request: FastifyRequest<{ Params: { cartId: string; variantId: string } }>,
+    request: FastifyRequest<{ Params: { variantId: string } }>,
     reply: FastifyReply
   ): Promise<void> {
     const input = updateCartItemSchema.parse(request.body);
-    const cart = await cartService.updateItem(
-      request.params.cartId,
-      request.params.variantId,
-      input
-    );
-    sendSuccess(reply, cart, 'Cart updated');
+    const cart = await cartService.resolveForRequest(request, reply);
+    const updated = await cartService.updateItem(cart.id, request.params.variantId, input);
+    sendSuccess(reply, updated, 'Cart updated');
   }
 
   async removeItem(
-    request: FastifyRequest<{ Params: { cartId: string; variantId: string } }>,
+    request: FastifyRequest<{ Params: { variantId: string } }>,
     reply: FastifyReply
   ): Promise<void> {
-    const cart = await cartService.removeItem(
-      request.params.cartId,
-      request.params.variantId
-    );
-    sendSuccess(reply, cart, 'Item removed from cart');
+    const cart = await cartService.resolveForRequest(request, reply);
+    const updated = await cartService.removeItem(cart.id, request.params.variantId);
+    sendSuccess(reply, updated, 'Item removed from cart');
   }
 
   async merge(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-    const { sessionId, userId } = mergeCartSchema.parse(request.body);
-    await cartService.mergeGuestCart(sessionId, userId);
-    sendSuccess(reply, null, 'Cart merged successfully');
+    const sessionId = request.cookies?.[COOKIE_NAMES.CART_SESSION];
+    if (sessionId && request.user?.userId) {
+      await cartService.mergeGuestCart(sessionId, request.user.userId);
+    }
+    const cart = await cartService.resolveForRequest(request, reply);
+    sendSuccess(reply, cart, 'Cart merged successfully');
   }
 }
 

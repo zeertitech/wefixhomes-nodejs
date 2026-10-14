@@ -11,14 +11,16 @@ export async function orderRoutes(app: FastifyInstance): Promise<void> {
       summary: 'Create order from cart',
       body: {
         type: 'object',
-        required: ['customerId', 'addressId', 'cartId'],
+        required: ['addressId'],
         properties: {
           customerId: { type: 'string' },
+          userId: { type: 'string' },
           addressId: { type: 'string' },
           cartId: { type: 'string' },
           couponCode: { type: 'string' },
           notes: { type: 'string' },
           idempotencyKey: { type: 'string', format: 'uuid' },
+          paymentMethod: { type: 'string', enum: ['COD', 'RAZORPAY'] },
         },
       },
     },

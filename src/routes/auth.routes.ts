@@ -38,6 +38,30 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     handler: authController.verifyEmail.bind(authController),
   });
 
+  app.post('/forgot-password', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Email a password reset code to the account',
+    },
+    handler: authController.forgotPassword.bind(authController),
+  });
+
+  app.post('/forgot-password/verify', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Verify a password reset code',
+    },
+    handler: authController.verifyForgotPassword.bind(authController),
+  });
+
+  app.post('/reset-password', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Set a new password after the reset code is verified',
+    },
+    handler: authController.resetPassword.bind(authController),
+  });
+
   app.post('/login', {
     schema: {
       tags: ['Auth'],
@@ -104,6 +128,66 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     preHandler: [authenticate],
     handler: authController.me.bind(authController),
+  });
+
+  app.get('/me/profile', {
+    schema: { tags: ['Account'], summary: 'Get my profile', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.profile.bind(authController),
+  });
+
+  app.patch('/me/profile', {
+    schema: { tags: ['Account'], summary: 'Update my name', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.updateName.bind(authController),
+  });
+
+  app.post('/me/profile/picture', {
+    schema: { tags: ['Account'], summary: 'Upload my profile picture', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.uploadProfileImage.bind(authController),
+  });
+
+  app.post('/me/phone/otp', {
+    schema: { tags: ['Account'], summary: 'Email a code to confirm a new phone number', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.startPhoneChange.bind(authController),
+  });
+
+  app.post('/me/phone', {
+    schema: { tags: ['Account'], summary: 'Confirm the new phone number', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.confirmPhoneChange.bind(authController),
+  });
+
+  app.post('/me/password/otp', {
+    schema: { tags: ['Account'], summary: 'Email a password-change code', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.sendPasswordCode.bind(authController),
+  });
+
+  app.post('/me/password', {
+    schema: { tags: ['Account'], summary: 'Change password with email code', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.changePassword.bind(authController),
+  });
+
+  app.post('/me/email/otp', {
+    schema: { tags: ['Account'], summary: 'Email a code to the current address', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.startEmailChange.bind(authController),
+  });
+
+  app.post('/me/email/confirm-current', {
+    schema: { tags: ['Account'], summary: 'Confirm current email and code the new address', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.confirmCurrentEmail.bind(authController),
+  });
+
+  app.post('/me/email/confirm-new', {
+    schema: { tags: ['Account'], summary: 'Confirm the new email', security: [{ bearerAuth: [] }] },
+    preHandler: [authenticate],
+    handler: authController.confirmNewEmail.bind(authController),
   });
 
   // Self-service account. Identity comes from the session, never from the URL.

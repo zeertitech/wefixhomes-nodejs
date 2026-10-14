@@ -5,7 +5,11 @@ import { logger } from '../config/logger';
 import { verificationCodeEmail } from './email-templates';
 
 export class EmailService {
-  async sendVerificationCode(to: string, code: string): Promise<void> {
+  async sendVerificationCode(
+    to: string,
+    code: string,
+    copy?: { title: string; detail: string; subject?: string }
+  ): Promise<void> {
     if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASSWORD) {
       throw new BusinessError('Email delivery is not configured yet');
     }
@@ -20,7 +24,7 @@ export class EmailService {
       },
     });
 
-    const message = verificationCodeEmail(code);
+    const message = verificationCodeEmail(code, copy);
     await transporter.sendMail({
       from: env.SMTP_FROM,
       to,

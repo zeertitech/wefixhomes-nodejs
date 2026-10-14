@@ -28,9 +28,9 @@ export class AccountService {
         items: {
           select: { quantity: true, snapshotName: true, totalPrice: true },
         },
-        payment: { select: { status: true } },
+        payment: { select: { status: true, method: true } },
         shipment: { select: { status: true } },
-        address: { select: { name: true, city: true, state: true, pincode: true } },
+        address: { select: { name: true, phone: true, city: true, state: true, pincode: true } },
       },
     });
 

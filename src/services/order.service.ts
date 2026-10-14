@@ -1,13 +1,14 @@
 import { prisma } from '../config/prisma';
 import { orderRepository } from '../repositories/order.repository';
 import { cartRepository } from '../repositories/cart.repository';
-import { NotFoundError, BusinessError } from '../lib/errors';
+import { NotFoundError, BusinessError, ForbiddenError } from '../lib/errors';
 import { generateOrderNumber } from '../utils/orderNumber';
 import { getPaginationParams } from '../utils/pagination';
 import { smsService } from './sms.service';
 import { auditService } from './audit.service';
 import type { CreateOrderInput, UpdateOrderStatusInput } from '../validators/order.validator';
 import type { PaginationInput } from '../utils/pagination';
+import { roundMoney, shippingAmountFor } from '../lib/commerce';
 
 export class OrderService {
   async create(input: CreateOrderInput, adminId: string) {
@@ -17,17 +18,39 @@ export class OrderService {
       if (existing) return existing;
     }
 
+    if (!input.cartId) {
+      throw new BusinessError('Cart is empty or not found');
+    }
+
     const cart = await cartRepository.findById(input.cartId);
     if (!cart || cart.items.length === 0) {
       throw new BusinessError('Cart is empty or not found');
     }
 
+    if (cart.userId && cart.userId !== input.userId) {
+      throw new ForbiddenError('This bag belongs to another account');
+    }
+
     const order = await prisma.$transaction(async (tx) => {
+      const address = await tx.address.findUnique({ where: { id: input.addressId } });
+      if (!address || address.userId !== input.userId) {
+        throw new BusinessError('Shipping address does not belong to this account');
+      }
+
       let subtotal = 0;
       let taxAmount = 0;
       const orderItems = [];
 
       for (const item of cart.items) {
+        if (
+          !item.variant.isActive ||
+          item.variant.deletedAt ||
+          !item.variant.product.isActive ||
+          item.variant.product.deletedAt
+        ) {
+          throw new BusinessError(`${item.variant.product.name} is no longer available`);
+        }
+
         // Lock inventory row and check stock
         const inventory = await tx.inventory.findUnique({
           where: { variantId: item.variantId },
@@ -41,19 +64,20 @@ export class OrderService {
           );
         }
 
-        const itemSubtotal = Number(item.price) * item.quantity;
+        const unitPrice = roundMoney(Number(item.variant.price));
+        const itemSubtotal = roundMoney(unitPrice * item.quantity);
         const taxRate = Number(item.variant.product.taxRate);
-        const itemTax = (itemSubtotal * taxRate) / 100;
+        const itemTax = roundMoney((itemSubtotal * taxRate) / 100);
 
-        subtotal += itemSubtotal;
-        taxAmount += itemTax;
+        subtotal = roundMoney(subtotal + itemSubtotal);
+        taxAmount = roundMoney(taxAmount + itemTax);
 
         orderItems.push({
           variantId: item.variantId,
           quantity: item.quantity,
-          unitPrice: item.price,
+          unitPrice,
           taxRate: item.variant.product.taxRate,
-          totalPrice: itemSubtotal + itemTax,
+          totalPrice: roundMoney(itemSubtotal + itemTax),
           snapshotName: item.variant.product.name,
           snapshotSku: item.variant.sku,
         });
@@ -97,7 +121,8 @@ export class OrderService {
         }
       }
 
-      const total = Math.max(0, subtotal + taxAmount - discountAmount);
+      const shippingAmount = shippingAmountFor(subtotal);
+      const total = roundMoney(Math.max(0, subtotal + taxAmount + shippingAmount - discountAmount));
 
       const created = await tx.order.create({
         data: {
@@ -108,10 +133,20 @@ export class OrderService {
           subtotal,
           taxAmount,
           discountAmount,
+          shippingAmount,
           total,
           notes: input.notes,
           idempotencyKey: input.idempotencyKey,
           items: { create: orderItems },
+          ...(input.paymentMethod === 'COD' && {
+            payment: {
+              create: {
+                method: 'COD',
+                status: 'PENDING',
+                amount: total,
+              },
+            },
+          }),
         },
         include: {
           items: true,

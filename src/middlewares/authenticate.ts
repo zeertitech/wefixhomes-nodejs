@@ -142,3 +142,22 @@ export async function authenticate(
     throw new AuthError('Authentication failed. Please log in again.');
   }
 }
+
+/**
+ * Attaches request.user when a valid session exists.
+ * Shoppers without a session continue as guests instead of receiving 401.
+ */
+export async function optionalAuthenticate(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  try {
+    await authenticate(request, reply);
+  } catch (err) {
+    if (err instanceof AuthError) {
+      request.user = undefined;
+      return;
+    }
+    throw err;
+  }
+}

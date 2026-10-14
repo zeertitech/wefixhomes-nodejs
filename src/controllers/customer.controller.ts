@@ -8,7 +8,8 @@ import {
 } from '../validators/customer.validator';
 import { paginationSchema, getPaginationParams } from '../utils/pagination';
 import { sendSuccess, paginationMeta } from '../lib/response';
-import { NotFoundError, ConflictError } from '../lib/errors';
+import { NotFoundError, ConflictError, ForbiddenError, AuthError } from '../lib/errors';
+import { optionalAuthenticate } from '../middlewares/authenticate';
 
 export class UserController {
   async create(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -119,6 +120,15 @@ export class UserController {
     request: FastifyRequest<{ Params: { id: string } }>,
     reply: FastifyReply
   ): Promise<void> {
+    await optionalAuthenticate(request, reply);
+    if (!request.user) {
+      throw new AuthError('Sign in to save a shipping address');
+    }
+    const isStaff = request.user.role === 'ADMIN' || request.user.role === 'STAFF';
+    if (!isStaff && request.user.userId !== request.params.id) {
+      throw new ForbiddenError('You can only save an address on your own account');
+    }
+
     const user = await prisma.user.findFirst({
       where: { id: request.params.id, deletedAt: null },
     });

@@ -3,11 +3,29 @@ import { orderService } from '../services/order.service';
 import { createOrderSchema, updateOrderStatusSchema } from '../validators/order.validator';
 import { paginationSchema } from '../utils/pagination';
 import { sendSuccess, paginationMeta } from '../lib/response';
+import { cartService } from '../services/cart.service';
+import { ForbiddenError } from '../lib/errors';
+import { optionalAuthenticate } from '../middlewares/authenticate';
 
 export class OrderController {
   async create(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-    const input = createOrderSchema.parse(request.body);
-    const order = await orderService.create(input, request.user?.userId ?? 'guest');
+    await optionalAuthenticate(request, reply);
+
+    const raw = (request.body ?? {}) as Record<string, unknown>;
+    const input = createOrderSchema.parse({
+      ...raw,
+      userId: raw.userId ?? raw.customerId,
+    });
+
+    if (request.user && input.userId !== request.user.userId) {
+      throw new ForbiddenError('Cannot place an order for another account');
+    }
+
+    const cart = await cartService.resolveForRequest(request, reply);
+    const order = await orderService.create(
+      { ...input, cartId: cart.id },
+      request.user?.userId ?? input.userId
+    );
     sendSuccess(reply, order, 'Order created', 201);
   }
 

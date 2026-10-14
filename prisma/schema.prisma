@@ -12,6 +12,7 @@ model User {
   passwordHash  String         @map("password_hash")
   salt          String
   phone         String?        @unique
+  profileImage  String?        @map("profile_image")
   roleId        Int            @map("role_id")
   firstName     String         @map("first_name")
   lastName      String         @map("last_name")
@@ -55,6 +56,11 @@ enum OtpChannel {
 enum OtpPurpose {
   REGISTER
   LOGIN
+  CHANGE_PASSWORD
+  CHANGE_EMAIL_CURRENT
+  CHANGE_EMAIL_NEW
+  CHANGE_PHONE
+  RESET_PASSWORD
 }
 
 model OtpCode {
@@ -64,6 +70,7 @@ model OtpCode {
   purpose     OtpPurpose
   destination String
   codeHash    String     @map("code_hash")
+  subject     String?
   expiresAt   DateTime   @map("expires_at")
   attempts    Int        @default(0)
   consumedAt  DateTime?  @map("consumed_at")

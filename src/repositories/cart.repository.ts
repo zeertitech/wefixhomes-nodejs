@@ -5,9 +5,11 @@ const cartWithItems = {
     include: {
       variant: {
         include: {
+          size: { select: { id: true, value: true } },
           product: {
             include: {
               images: { where: { isPrimary: true }, take: 1 },
+              color: { select: { id: true, value: true } },
             },
           },
           inventory: { select: { quantity: true, reservedQuantity: true } },
@@ -72,7 +74,7 @@ export class CartRepository {
     await prisma.cartItem.upsert({
       where: { cartId_variantId: { cartId, variantId } },
       create: { cartId, variantId, quantity, price },
-      update: { quantity, updatedAt: new Date() },
+      update: { quantity, price, updatedAt: new Date() },
     });
     await this.touchActivity(cartId);
   }

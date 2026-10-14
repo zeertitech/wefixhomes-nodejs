@@ -1,6 +1,12 @@
-export function verificationCodeEmail(code: string) {
-  const subject = 'Your Shanandra verification code';
-  const text = `Your Shanandra verification code is ${code}. It expires in 10 minutes. If you did not create an account, you can ignore this email.`;
+export function verificationCodeEmail(
+  code: string,
+  copy: { title: string; detail: string; subject?: string } = {
+    title: 'Confirm your email',
+    detail: 'Use this code to finish creating your account. It expires in 10 minutes.',
+  }
+) {
+  const subject = copy.subject ?? 'Your Shanandra verification code';
+  const text = `Your Shanandra verification code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -22,8 +28,8 @@ export function verificationCodeEmail(code: string) {
           </tr>
           <tr>
             <td style="padding:20px 32px 8px;text-align:center;font-family:Arial,sans-serif;color:#f6f1e7;">
-              <p style="margin:0;font-size:16px;line-height:1.5;">Confirm your email</p>
-              <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#cbbba6;">Use this code to finish creating your account. It expires in 10 minutes.</p>
+              <p style="margin:0;font-size:16px;line-height:1.5;">${copy.title}</p>
+              <p style="margin:12px 0 0;font-size:13px;line-height:1.6;color:#cbbba6;">${copy.detail}</p>
             </td>
           </tr>
           <tr>
@@ -33,7 +39,7 @@ export function verificationCodeEmail(code: string) {
           </tr>
           <tr>
             <td style="padding:0 32px 28px;text-align:center;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#9c8b76;">
-              If you did not request this, you can ignore this email. We will not create a verified account without this code.
+              If you did not request this, you can ignore this email.
             </td>
           </tr>
         </table>

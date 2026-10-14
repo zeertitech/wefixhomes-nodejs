@@ -30,4 +30,3 @@ process.on('unhandledRejection', (reason) => {
 });
 
 main();
-// restarted for public product routes
