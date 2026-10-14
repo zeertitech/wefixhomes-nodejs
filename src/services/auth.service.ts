@@ -2,10 +2,11 @@ import { userRepository } from '../repositories/user.repository';
 import { verifyPassword, hashPassword, generateSalt } from '../utils/hash';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { prisma } from '../config/prisma';
-import { AuthError, ConflictError } from '../lib/errors';
-import type { LoginInput, RegisterInput } from '../validators/auth.validator';
+import { AuthError, ConflictError, BusinessError } from '../lib/errors';
+import type { CustomerSignupInput, LoginInput, RegisterInput } from '../validators/auth.validator';
 import { logger } from '../config/logger';
 import { User, Role } from '@prisma/client';
+import { otpService } from './otp.service';
 
 type UserWithRole = User & { role: Role };
 
@@ -28,6 +29,7 @@ export class AuthService {
       roleId: customerRole.id,
       firstName: input.firstName,
       lastName: input.lastName,
+      emailVerified: true,
     });
 
     logger.info('New user registered', { userId: user.id, email: user.email });
@@ -56,6 +58,10 @@ export class AuthService {
     if (!isValid) {
       logger.warn('Failed login attempt', { email: input.email, ip });
       throw new AuthError('Invalid email or password');
+    }
+
+    if (!user.emailVerified) {
+      throw new AuthError('Verify your email before signing in');
     }
 
     const payload = {
@@ -154,6 +160,99 @@ export class AuthService {
   async logoutAll(userId: string): Promise<void> {
     await userRepository.deleteAllRefreshTokens(userId);
     logger.info('All sessions revoked', { userId });
+  }
+
+  async signup(input: CustomerSignupInput) {
+    const email = input.email;
+    const phoneOwner = await userRepository.findByPhone(input.phone);
+    if (phoneOwner && phoneOwner.email !== email) {
+      throw new ConflictError('This mobile number is already in use');
+    }
+
+    const existing = await userRepository.findByEmail(email);
+    if (existing?.emailVerified) {
+      throw new ConflictError('An account with this email already exists');
+    }
+    if (existing && existing.phone && existing.phone !== input.phone && phoneOwner) {
+      throw new ConflictError('This mobile number is already in use');
+    }
+
+    const customerRole = await userRepository.findRoleByName('CUSTOMER');
+    if (!customerRole) throw new Error('Default role not found');
+
+    const salt = generateSalt();
+    const passwordHash = await hashPassword(input.password, salt);
+    const localName = email.split('@')[0]?.slice(0, 50) || 'Customer';
+
+    const user = existing
+      ? await prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            phone: input.phone,
+            passwordHash,
+            salt,
+            emailVerified: false,
+          },
+        })
+      : await userRepository.create({
+          email,
+          phone: input.phone,
+          passwordHash,
+          salt,
+          roleId: customerRole.id,
+          firstName: localName,
+          lastName: '',
+          emailVerified: false,
+        });
+
+    try {
+      await otpService.sendEmailRegisterCode(user.id, email);
+    } catch (err) {
+      if (err instanceof BusinessError || err instanceof AuthError) throw err;
+      logger.error('Failed to send verification email', { userId: user.id });
+      throw new BusinessError('Could not send the verification email. Try again.');
+    }
+
+    return { email };
+  }
+
+  async verifyEmail(email: string, code: string, ip: string) {
+    const userId = await otpService.verifyEmailRegisterCode(email, code);
+    const user = (await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    })) as UserWithRole | null;
+
+    if (!user || !user.isActive) {
+      throw new AuthError('Invalid or expired code');
+    }
+
+    const payload = {
+      userId: user.id,
+      role: user.role.name,
+      roleId: user.roleId,
+      email: user.email,
+    };
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await userRepository.createRefreshToken(user.id, refreshToken, expiresAt);
+    await userRepository.updateLastLogin(user.id);
+
+    logger.info('Email verified and user signed in', { userId: user.id, ip });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role.name,
+        roleId: user.roleId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    };
   }
 }
 

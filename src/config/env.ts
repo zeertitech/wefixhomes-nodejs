@@ -24,6 +24,19 @@ const envSchema = z.object({
   COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).optional(),
   COOKIE_SECRET: z.string().min(16).optional(),
 
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  SMTP_FROM: z.string().default('Shanandra <noreply@shanandra.in>'),
+
+  // Filled in later. Empty values keep the API running until OAuth is wired up.
+  OAUTH2_PROVIDER: z.string().default('google'),
+  OAUTH2_CLIENT_ID: z.string().default(''),
+  OAUTH2_CLIENT_SECRET: z.string().default(''),
+  OAUTH2_CALLBACK_URL: z.string().default(''),
+  OAUTH2_ISSUER: z.string().default('https://accounts.google.com'),
+
   PEPPER_SECRET: z.string().min(32, 'PEPPER_SECRET must be at least 32 characters'),
 
   R2_ACCOUNT_ID: z.string().min(1),

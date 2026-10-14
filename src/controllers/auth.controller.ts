@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { authService } from '../services/auth.service';
-import { loginSchema, registerSchema } from '../validators/auth.validator';
+import { loginSchema, registerSchema, customerSignupSchema, verifyEmailOtpSchema } from '../validators/auth.validator';
 import { sendSuccess, sendCreated } from '../lib/response';
 import { setAuthCookies, clearAuthCookies } from '../utils/cookie';
 import { BusinessError } from '../lib/errors';
@@ -69,6 +69,22 @@ export class AuthController {
 
   async me(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     sendSuccess(reply, request.user, 'Authenticated user info');
+  }
+
+  async signup(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const input = customerSignupSchema.parse(request.body);
+    const result = await authService.signup(input);
+    sendSuccess(reply, result, 'Verification code sent');
+  }
+
+  async verifyEmail(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const input = verifyEmailOtpSchema.parse(request.body);
+    const result = await authService.verifyEmail(input.email, input.code, request.ip);
+    setAuthCookies(reply, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+    sendSuccess(reply, result, 'Email verified');
   }
 }
 

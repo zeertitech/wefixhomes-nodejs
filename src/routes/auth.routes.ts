@@ -22,6 +22,22 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     handler: authController.register.bind(authController),
   });
 
+  app.post('/signup', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Create a customer account and email a verification code',
+    },
+    handler: authController.signup.bind(authController),
+  });
+
+  app.post('/verify-email', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Verify the email OTP and start a session',
+    },
+    handler: authController.verifyEmail.bind(authController),
+  });
+
   app.post('/login', {
     schema: {
       tags: ['Auth'],

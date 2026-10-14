@@ -16,6 +16,8 @@ model User {
   firstName     String         @map("first_name")
   lastName      String         @map("last_name")
   isActive      Boolean        @default(true) @map("is_active")
+  emailVerified Boolean        @default(false) @map("email_verified")
+  phoneVerified Boolean        @default(false) @map("phone_verified")
   lastLoginAt   DateTime?      @map("last_login_at")
   deletedAt     DateTime?      @map("deleted_at")
   createdAt     DateTime       @default(now()) @map("created_at")
@@ -27,6 +29,7 @@ model User {
   addresses     Address[]
   carts         Cart[]
   orders        Order[]
+  otpCodes      OtpCode[]
 
   @@index([email])
   @@index([phone])
@@ -42,6 +45,35 @@ model Role {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("roles")
+}
+
+enum OtpChannel {
+  EMAIL
+  SMS
+}
+
+enum OtpPurpose {
+  REGISTER
+  LOGIN
+}
+
+model OtpCode {
+  id          String     @id @default(cuid())
+  userId      String?    @map("user_id")
+  channel     OtpChannel
+  purpose     OtpPurpose
+  destination String
+  codeHash    String     @map("code_hash")
+  expiresAt   DateTime   @map("expires_at")
+  attempts    Int        @default(0)
+  consumedAt  DateTime?  @map("consumed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  user        User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([destination, channel, purpose])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("otp_codes")
 }
 
 model RefreshToken {
