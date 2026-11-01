@@ -52,6 +52,15 @@ export const verifyEmailOtpSchema = z.object({
   code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
 });
 
+export const verifyPhoneOtpSchema = z.object({
+  phone: z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
+  code: z.string().regex(/^\d{6}$/, 'Enter the 6-digit code'),
+});
+
+export const requestLoginOtpSchema = z.object({
+  phone: z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number'),
+});
+
 export type CustomerSignupInput = z.infer<typeof customerSignupSchema>;
 export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
 

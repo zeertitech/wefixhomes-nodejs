@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { authService } from '../services/auth.service';
-import { loginSchema, registerSchema, customerSignupSchema, verifyEmailOtpSchema, updateNameSchema, changePasswordSchema, startEmailChangeSchema, confirmCurrentEmailSchema, confirmNewEmailSchema, startPhoneChangeSchema, confirmPhoneSchema, forgotPasswordSchema, verifyForgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator';
+import { loginSchema, registerSchema, customerSignupSchema, verifyEmailOtpSchema, verifyPhoneOtpSchema, requestLoginOtpSchema, updateNameSchema, changePasswordSchema, startEmailChangeSchema, confirmCurrentEmailSchema, confirmNewEmailSchema, startPhoneChangeSchema, confirmPhoneSchema, forgotPasswordSchema, verifyForgotPasswordSchema, resetPasswordSchema } from '../validators/auth.validator';
 import { sendSuccess, sendCreated } from '../lib/response';
 import { setAuthCookies, clearAuthCookies } from '../utils/cookie';
 import { BusinessError } from '../lib/errors';
@@ -24,6 +24,22 @@ export class AuthController {
       refreshToken: result.refreshToken,
     });
 
+    sendSuccess(reply, result, 'Login successful');
+  }
+
+  async requestLoginOtp(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const input = requestLoginOtpSchema.parse(request.body);
+    const result = await authService.requestLoginOtp(input.phone);
+    sendSuccess(reply, result, 'Verification code sent');
+  }
+
+  async verifyLoginOtp(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const input = verifyPhoneOtpSchema.parse(request.body);
+    const result = await authService.verifyLoginOtp(input.phone, input.code, request.ip);
+    setAuthCookies(reply, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    });
     sendSuccess(reply, result, 'Login successful');
   }
 
@@ -87,6 +103,12 @@ export class AuthController {
       refreshToken: result.refreshToken,
     });
     sendSuccess(reply, result, 'Email verified');
+  }
+
+  async verifyPhone(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const input = verifyPhoneOtpSchema.parse(request.body);
+    const result = await authService.verifySignupPhone(input.phone, input.code);
+    sendSuccess(reply, result, 'Phone number verified');
   }
 
   async profile(request: FastifyRequest, reply: FastifyReply): Promise<void> {

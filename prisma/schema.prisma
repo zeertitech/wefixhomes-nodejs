@@ -481,3 +481,113 @@ enum DiscountType {
   PERCENTAGE
   FIXED
 }
+
+enum EnquiryStatus {
+  NEW
+  CONTACTED
+  CLOSED
+}
+
+model Enquiry {
+  id          String        @id @default(cuid())
+  name        String
+  phone       String
+  service     String
+  address     String
+  requirement String?
+  status      EnquiryStatus @default(NEW)
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("enquiries")
+}
+
+/// Home-service catalogue category. Distinct from the unused commerce Category model.
+/// Prices are not stored here. Deactivate, or delete only when no services reference it.
+model ServiceCategory {
+  id             String    @id @default(cuid())
+  name           String
+  slug           String    @unique
+  description    String?
+  note           String?
+  seoTitle       String?   @map("seo_title") @db.VarChar(70)
+  seoDescription String?   @map("seo_description") @db.VarChar(160)
+  seoKeywords    String?   @map("seo_keywords") @db.VarChar(255)
+  imageKey       String?   @map("image_key")
+  imageUrl       String?   @map("image_url")
+  isActive    Boolean   @default(true) @map("is_active")
+  isFeatured  Boolean   @default(false) @map("is_featured")
+  sortOrder   Int       @default(0) @map("sort_order")
+  deletedAt   DateTime? @map("deleted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  services    Service[]
+  labels      CategoryLabel[]
+
+  @@index([isActive, sortOrder])
+  @@index([deletedAt])
+  @@map("service_categories")
+}
+
+/// A filter label owned by one service category, such as Interior under Painting.
+/// Slugs are unique inside the category, not across the catalogue.
+model CategoryLabel {
+  id          String          @id @default(cuid())
+  categoryId  String          @map("category_id")
+  name        String
+  slug        String
+  description String?
+  sortOrder   Int             @default(0) @map("sort_order")
+  isActive    Boolean         @default(true) @map("is_active")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  category    ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  services    ServiceLabel[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, isActive, sortOrder])
+  @@map("category_labels")
+}
+
+/// Explicit assignment of a category label to a service.
+/// The service layer rejects labels that belong to a different category.
+model ServiceLabel {
+  serviceId String        @map("service_id")
+  labelId   String        @map("label_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+  service   Service       @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  label     CategoryLabel @relation(fields: [labelId], references: [id], onDelete: Restrict)
+
+  @@id([serviceId, labelId])
+  @@index([labelId])
+  @@map("service_labels")
+}
+
+/// A bookable home service. MRP and selling price are INR numeric values.
+/// Offer percentage is not stored; a future booking should snapshot these prices.
+model Service {
+  id               String          @id @default(cuid())
+  categoryId       String          @map("category_id")
+  name             String
+  slug             String          @unique
+  shortDescription String?         @map("short_description")
+  description      String?
+  mrp              Decimal         @db.Decimal(10, 2)
+  sellingPrice     Decimal         @map("selling_price") @db.Decimal(10, 2)
+  imageKey         String?         @map("image_key")
+  imageUrl         String?         @map("image_url")
+  isActive         Boolean         @default(true) @map("is_active")
+  sortOrder        Int             @default(0) @map("sort_order")
+  deletedAt        DateTime?       @map("deleted_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  category         ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  labels           ServiceLabel[]
+
+  @@index([categoryId])
+  @@index([isActive, sortOrder])
+  @@index([deletedAt])
+  @@map("services")
+}

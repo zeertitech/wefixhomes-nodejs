@@ -28,7 +28,7 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().default(587),
   SMTP_USER: z.string().optional(),
   SMTP_PASSWORD: z.string().optional(),
-  SMTP_FROM: z.string().default('Shanandra <noreply@shanandra.in>'),
+  SMTP_FROM: z.string().default('WeFixHomes <noreply@wefixhomes.in>'),
 
   // Filled in later. Empty values keep the API running until OAuth is wired up.
   OAUTH2_PROVIDER: z.string().default('google'),
@@ -39,24 +39,27 @@ const envSchema = z.object({
 
   PEPPER_SECRET: z.string().min(32, 'PEPPER_SECRET must be at least 32 characters'),
 
-  R2_ACCOUNT_ID: z.string().min(1),
-  R2_ACCESS_KEY: z.string().min(1),
-  R2_SECRET_KEY: z.string().min(1),
-  R2_BUCKET: z.string().min(1),
-  R2_PUBLIC_URL: z.string().min(1),
+  // Optional until image uploads are used. Empty values must not block startup.
+  R2_ACCOUNT_ID: z.string().default(''),
+  R2_ACCESS_KEY: z.string().default(''),
+  R2_SECRET_KEY: z.string().default(''),
+  R2_BUCKET: z.string().default(''),
+  R2_PUBLIC_URL: z.string().default(''),
   R2_PUBLIC_FOLDER_CATEGORY: z.string().default('categories'),
-  R2_PUBLIC_FOLDER_PRODUCT: z.string().default('products'),
+  R2_PUBLIC_FOLDER_PRODUCT: z.string().default('services'),
   R2_PUBLIC_FOLDER_PROFILE: z.string().default('profile'),
 
-  RAZORPAY_KEY_ID: z.string().min(1),
-  RAZORPAY_KEY_SECRET: z.string().min(1),
-  RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
+  // Optional until payments, SMS, or shipping are mounted again.
+  RAZORPAY_KEY_ID: z.string().default(''),
+  RAZORPAY_KEY_SECRET: z.string().default(''),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default(''),
 
-  SMS_API_KEY: z.string().min(1),
+  SMS_API_KEY: z.string().default(''),
+  SMS_SENDER_ID: z.string().default(''),
   SMS_TEMPLATE_NAME: z.string().default('ORDERCONF'),
 
-  SHIPROCKET_EMAIL: z.string().email(),
-  SHIPROCKET_PASSWORD: z.string().min(1),
+  SHIPROCKET_EMAIL: z.string().default(''),
+  SHIPROCKET_PASSWORD: z.string().default(''),
 
   ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
   RATE_LIMIT_MAX: z.coerce.number().default(100),

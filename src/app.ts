@@ -6,7 +6,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
     logger: false,          // We use Winston instead
     trustProxy: true,       // Required when behind Railway / Nginx
-    bodyLimit: parseInt(env.MAX_FILE_SIZE, 10),
+    bodyLimit: parseInt(env.MAX_FILE_SIZE, 10) + 65_536,
   });
 
   // ── Setup Plugins & Middleware ────────────────────────────

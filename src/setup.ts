@@ -13,15 +13,14 @@ import { requestLogger } from './middlewares/requestLogger';
 
 import { systemRoutes } from './routes/system.routes';
 import { authRoutes } from './routes/auth.routes';
-import { productRoutes } from './routes/product.routes';
-import { categoryRoutes } from './routes/category.routes';
-import { publicCategoryRoutes } from './routes/public-category.routes';
-import { publicProductRoutes } from './routes/public-product.routes';
-import { cartRoutes } from './routes/cart.routes';
-import { orderRoutes } from './routes/order.routes';
-import { paymentRoutes } from './routes/payment.routes';
-import { shipmentRoutes } from './routes/shipment.routes';
-import { inventoryRoutes } from './routes/inventory.routes';
+import { enquiryRoutes } from './routes/enquiry.routes';
+import {
+  adminCategoryRoutes,
+  adminServiceRoutes,
+  adminUploadRoutes,
+  publicCategoryRoutes,
+  publicServiceRoutes,
+} from './routes/catalogue.routes';
 
 export async function setupPlugins(app: FastifyInstance) {
   // ── Security headers ──────────────────────────────────────
@@ -76,14 +75,10 @@ export async function setupPlugins(app: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'Fashion E-Commerce API',
-        description:
-          'Production-grade single-vendor fashion e-commerce backend.\n\n' +
-          '**Default admin credentials (after seeding):**\n' +
-          '- Email: `admin@fashionstore.com`\n' +
-          '- Password: `Admin@123`',
+        title: 'WeFixHomes API',
+        description: 'Painting and home repair services API.',
         version: '1.0.0',
-        contact: { name: 'API Support', email: 'dev@fashionstore.com' },
+        contact: { name: 'WeFixHomes', email: 'noreply@wefixhomes.in' },
       },
       components: {
         securitySchemes: {
@@ -96,17 +91,9 @@ export async function setupPlugins(app: FastifyInstance) {
         },
       },
       tags: [
-        { name: 'Auth', description: 'Authentication & session management' },
-        { name: 'Products', description: 'Product & variant management' },
-        { name: 'Categories', description: 'Category hierarchy management' },
-        { name: 'Public Categories', description: 'Public storefront category endpoints' },
-        { name: 'Public Products', description: 'Public storefront product listing and filters' },
-        { name: 'Users', description: 'User & address management' },
-        { name: 'Cart', description: 'Shopping cart (guest + authenticated)' },
-        { name: 'Orders', description: 'Order lifecycle management' },
-        { name: 'Payments', description: 'Razorpay payment processing' },
-        { name: 'Shipments', description: 'Shiprocket shipping integration' },
-        { name: 'Inventory', description: 'Stock & inventory management' },
+        { name: 'Auth', description: 'Authentication and session management' },
+        { name: 'Enquiries', description: 'Public estimate requests and admin follow-up' },
+        { name: 'Service catalogue', description: 'Public and admin home-service catalogue' },
       ],
     },
   });
@@ -133,16 +120,11 @@ export async function setupRoutes(app: FastifyInstance) {
   // ── API routes ────────────────────────────────────────────
   const prefix = env.API_PREFIX;
 
-  await app.register(authRoutes,            { prefix: `${prefix}/auth` });
-  await app.register(productRoutes,         { prefix: `${prefix}/products` });
-  await app.register(categoryRoutes,        { prefix: `${prefix}/categories` });
-  await app.register(publicCategoryRoutes,  { prefix: `${prefix}/public/categories` });
-  await app.register(publicCategoryRoutes,  { prefix: `/v1/public/categories` });
-  await app.register(publicProductRoutes,   { prefix: `${prefix}/public/products` });
-  await app.register(publicProductRoutes,   { prefix: `/v1/public/products` });
-  await app.register(cartRoutes,            { prefix: `${prefix}/cart` });
-  await app.register(orderRoutes,           { prefix: `${prefix}/orders` });
-  await app.register(paymentRoutes,         { prefix: `${prefix}/payments` });
-  await app.register(shipmentRoutes,        { prefix: `${prefix}/shipments` });
-  await app.register(inventoryRoutes,       { prefix: `${prefix}/inventory` });
+  await app.register(authRoutes, { prefix: `${prefix}/auth` });
+  await app.register(enquiryRoutes, { prefix: `${prefix}/enquiries` });
+  await app.register(publicCategoryRoutes, { prefix: `${prefix}/service-categories` });
+  await app.register(publicServiceRoutes, { prefix: `${prefix}/services` });
+  await app.register(adminCategoryRoutes, { prefix: `${prefix}/admin/service-categories` });
+  await app.register(adminServiceRoutes, { prefix: `${prefix}/admin/services` });
+  await app.register(adminUploadRoutes, { prefix: `${prefix}/admin/uploads` });
 }

@@ -30,6 +30,14 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     handler: authController.signup.bind(authController),
   });
 
+  app.post('/verify-phone', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Verify the signup SMS OTP for a mobile number',
+    },
+    handler: authController.verifyPhone.bind(authController),
+  });
+
   app.post('/verify-email', {
     schema: {
       tags: ['Auth'],
@@ -60,6 +68,22 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       summary: 'Set a new password after the reset code is verified',
     },
     handler: authController.resetPassword.bind(authController),
+  });
+
+  app.post('/login/otp', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Text a login code to a registered mobile number',
+    },
+    handler: authController.requestLoginOtp.bind(authController),
+  });
+
+  app.post('/login/otp/verify', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Verify the SMS login code and start a session',
+    },
+    handler: authController.verifyLoginOtp.bind(authController),
   });
 
   app.post('/login', {
@@ -149,7 +173,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/me/phone/otp', {
-    schema: { tags: ['Account'], summary: 'Email a code to confirm a new phone number', security: [{ bearerAuth: [] }] },
+    schema: { tags: ['Account'], summary: 'Text a code to confirm a new phone number', security: [{ bearerAuth: [] }] },
     preHandler: [authenticate],
     handler: authController.startPhoneChange.bind(authController),
   });

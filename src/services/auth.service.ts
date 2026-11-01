@@ -80,6 +80,62 @@ export class AuthService {
 
     logger.info('User logged in', { userId: user.id, role: user.role.name, ip });
 
+    return this.sessionFor(user, accessToken, refreshToken);
+  }
+
+  async requestLoginOtp(phone: string) {
+    const user = await userRepository.findByPhone(phone);
+    if (!user || !user.isActive || user.deletedAt) {
+      return { sent: true };
+    }
+
+    try {
+      await otpService.sendSmsCode(user.id, phone, 'LOGIN');
+    } catch (err) {
+      if (err instanceof BusinessError || err instanceof AuthError) throw err;
+      logger.error('Failed to send login SMS', { userId: user.id });
+      throw new BusinessError('Could not send the verification SMS. Try again.');
+    }
+
+    return { sent: true };
+  }
+
+  async verifyLoginOtp(phone: string, code: string, ip: string) {
+    const userId = await otpService.verifySmsCode(phone, code, 'LOGIN');
+    const user = (await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    })) as UserWithRole | null;
+
+    if (!user || !user.isActive || user.deletedAt || user.phone !== phone) {
+      throw new AuthError('Invalid or expired code');
+    }
+    if (!user.emailVerified) {
+      throw new AuthError('Verify your email before signing in');
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { phoneVerified: true },
+    });
+
+    const payload = {
+      userId: user.id,
+      role: user.role.name,
+      roleId: user.roleId,
+      email: user.email,
+    };
+    const accessToken = signAccessToken(payload);
+    const refreshToken = signRefreshToken(payload);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await userRepository.createRefreshToken(user.id, refreshToken, expiresAt);
+    await userRepository.updateLastLogin(user.id);
+
+    logger.info('User logged in with SMS OTP', { userId: user.id, ip });
+    return this.sessionFor(user, accessToken, refreshToken);
+  }
+
+  private sessionFor(user: UserWithRole, accessToken: string, refreshToken: string) {
     return {
       accessToken,
       refreshToken,
@@ -217,7 +273,28 @@ export class AuthService {
       throw new BusinessError('Could not send the verification email. Try again.');
     }
 
+    try {
+      await otpService.sendSmsCode(user.id, input.phone, 'REGISTER');
+    } catch (err) {
+      if (err instanceof BusinessError || err instanceof AuthError) throw err;
+      logger.error('Failed to send verification SMS', { userId: user.id });
+      throw new BusinessError('Could not send the verification SMS. Try again.');
+    }
+
     return { email };
+  }
+
+  async verifySignupPhone(phone: string, code: string) {
+    const userId = await otpService.verifySmsCode(phone, code, 'REGISTER');
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.isActive || user.deletedAt || user.phone !== phone) {
+      throw new AuthError('Invalid or expired code');
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { phoneVerified: true },
+    });
+    return { phoneVerified: true };
   }
 
   async verifyEmail(email: string, code: string, ip: string) {
@@ -294,14 +371,20 @@ export class AuthService {
     if (phone === user.phone) throw new BusinessError('That is already your phone number');
     const taken = await userRepository.findByPhone(phone);
     if (taken && taken.id !== userId) throw new ConflictError('This mobile number is already in use');
-    await otpService.sendAccountCode(user.id, user.email, 'CHANGE_PHONE', phone);
-    return { email: user.email };
+    try {
+      await otpService.sendSmsCode(user.id, phone, 'CHANGE_PHONE');
+    } catch (err) {
+      if (err instanceof BusinessError || err instanceof AuthError) throw err;
+      logger.error('Failed to send phone-change SMS', { userId: user.id });
+      throw new BusinessError('Could not send the verification SMS. Try again.');
+    }
+    return { phone };
   }
 
   async confirmPhoneChange(userId: string, phone: string, code: string) {
     const user = await this.requireActiveUser(userId);
-    const { subject } = await otpService.verifyAccountCode(user.id, user.email, code, 'CHANGE_PHONE');
-    if (subject !== phone) throw new AuthError('Invalid or expired code');
+    const verifiedUserId = await otpService.verifySmsCode(phone, code, 'CHANGE_PHONE');
+    if (verifiedUserId !== user.id) throw new AuthError('Invalid or expired code');
     const taken = await userRepository.findByPhone(phone);
     if (taken && taken.id !== userId) throw new ConflictError('This mobile number is already in use');
     const updated = await prisma.user.update({
@@ -325,7 +408,7 @@ export class AuthService {
   }
 
   private profileImageUrl(fileName: string | null) {
-    if (!fileName) return null;
+    if (!fileName || !env.R2_PUBLIC_URL) return null;
     const baseUrl = env.R2_PUBLIC_URL.replace(/\/+$/, '');
     const folder = env.R2_PUBLIC_FOLDER_PROFILE.replace(/^\/+|\/+$/g, '');
     const name = fileName.includes('/') ? fileName.split('/').pop() : fileName;
