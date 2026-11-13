@@ -13,6 +13,11 @@ export async function publicWorkRoutes(app: FastifyInstance): Promise<void> {
     handler: worksController.listPublic.bind(worksController),
   });
 
+  app.get('/categories', {
+    schema: { tags: ['Works'], summary: 'List categories that have a published project' },
+    handler: worksController.listPublicCategories.bind(worksController),
+  });
+
   app.get('/:slug', {
     schema: { tags: ['Works'], summary: 'Get a published project with its gallery' },
     handler: worksController.getPublic.bind(worksController),

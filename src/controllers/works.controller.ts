@@ -10,6 +10,10 @@ import {
 } from '../validators/works.validator';
 
 export class WorksController {
+  async listPublicCategories(_request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    sendSuccess(reply, await worksService.listPublicCategories(), 'Categories fetched');
+  }
+
   async listPublic(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const query = publicWorkQuerySchema.parse(request.query);
     const { works, total } = await worksService.listPublic(query);

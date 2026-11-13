@@ -130,6 +130,15 @@ async function releaseRemoved(before: string[], after: string[]): Promise<void> 
 }
 
 export class WorksService {
+  /** Categories that have at least one published project. Empty categories are omitted. */
+  async listPublicCategories() {
+    return prisma.serviceCategory.findMany({
+      where: { ...publicCategory, works: { some: { status: 'PUBLISHED' } } },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, slug: true },
+    });
+  }
+
   async listPublic(query: PublicWorkQuery) {
     const where: Prisma.WorkWhereInput = {
       status: 'PUBLISHED',
