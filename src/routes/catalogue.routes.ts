@@ -126,7 +126,7 @@ export async function adminServiceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.delete('/:id', {
-    schema: { tags: ['Service catalogue'], summary: 'Deactivate a service', security: [{ bearerAuth: [] }] },
+    schema: { tags: ['Service catalogue'], summary: 'Delete a service that no enquiry names', security: [{ bearerAuth: [] }] },
     preHandler: staff,
     handler: catalogueController.deleteService.bind(catalogueController),
   });

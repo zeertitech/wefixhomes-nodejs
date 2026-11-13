@@ -21,6 +21,7 @@ import {
   publicCategoryRoutes,
   publicServiceRoutes,
 } from './routes/catalogue.routes';
+import { adminWorkRoutes, publicWorkRoutes } from './routes/works.routes';
 
 export async function setupPlugins(app: FastifyInstance) {
   // ── Security headers ──────────────────────────────────────
@@ -94,6 +95,7 @@ export async function setupPlugins(app: FastifyInstance) {
         { name: 'Auth', description: 'Authentication and session management' },
         { name: 'Enquiries', description: 'Public estimate requests and admin follow-up' },
         { name: 'Service catalogue', description: 'Public and admin home-service catalogue' },
+        { name: 'Works', description: 'Our Works portfolio projects' },
       ],
     },
   });
@@ -127,4 +129,6 @@ export async function setupRoutes(app: FastifyInstance) {
   await app.register(adminCategoryRoutes, { prefix: `${prefix}/admin/service-categories` });
   await app.register(adminServiceRoutes, { prefix: `${prefix}/admin/services` });
   await app.register(adminUploadRoutes, { prefix: `${prefix}/admin/uploads` });
+  await app.register(publicWorkRoutes, { prefix: `${prefix}/works` });
+  await app.register(adminWorkRoutes, { prefix: `${prefix}/admin/works` });
 }

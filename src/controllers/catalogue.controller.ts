@@ -140,7 +140,7 @@ export class CatalogueController {
   async deleteService(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const { id } = idParamSchema.parse(request.params);
     const result = await catalogueService.deleteService(id, request.user!.userId, request.ip);
-    sendSuccess(reply, result, 'Service deactivated');
+    sendSuccess(reply, result, 'Service deleted');
   }
 
   async uploadImage(request: FastifyRequest, reply: FastifyReply): Promise<void> {

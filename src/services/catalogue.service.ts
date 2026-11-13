@@ -119,6 +119,7 @@ function assignedLabels(service: ServiceRecord, scope: 'public' | 'admin') {
     .map((label) => labelDto(label, scope));
 }
 
+/** Public and admin service payload. SEO fields are the search title, description, and keywords. */
 function serviceDto(service: ServiceRecord, scope: 'public' | 'admin') {
   const prices = priceFields(service.mrp, service.sellingPrice);
   const base = {
@@ -127,6 +128,9 @@ function serviceDto(service: ServiceRecord, scope: 'public' | 'admin') {
     slug: service.slug,
     shortDescription: service.shortDescription,
     description: service.description,
+    seoTitle: service.seoTitle,
+    seoDescription: service.seoDescription,
+    seoKeywords: service.seoKeywords,
     imageUrl: storageService.deliveryUrl(service.imageKey, 'service'),
     sortOrder: service.sortOrder,
     ...prices,
@@ -190,7 +194,7 @@ async function imageStillUsed(imageKey: string, except?: { categoryId?: string; 
   const fileName = imageKey.includes('/') ? imageKey.slice(imageKey.lastIndexOf('/') + 1) : imageKey;
   const folders = storageService.folders();
   const keys = [...new Set([imageKey, fileName, `${folders.category}/${fileName}`, `${folders.service}/${fileName}`])];
-  const [categories, services] = await prisma.$transaction([
+  const [categories, services, workCovers, workImages] = await prisma.$transaction([
     prisma.serviceCategory.count({
       where: {
         imageKey: { in: keys },
@@ -203,11 +207,14 @@ async function imageStillUsed(imageKey: string, except?: { categoryId?: string; 
         ...(except?.serviceId ? { id: { not: except.serviceId } } : {}),
       },
     }),
+    prisma.work.count({ where: { coverImage: { in: keys } } }),
+    prisma.workImage.count({ where: { imageKey: { in: keys } } }),
   ]);
-  return categories + services > 0;
+  return categories + services + workCovers + workImages > 0;
 }
 
-async function releaseImage(
+/** Deletes an image from storage unless a category, service or work still references it. */
+export async function releaseImage(
   imageKey: string | null,
   purpose: ImagePurpose,
   except?: { categoryId?: string; serviceId?: string }
@@ -239,6 +246,15 @@ function sameImage(left: string | null, right: string | null): boolean {
   const leftName = left.includes('/') ? left.slice(left.lastIndexOf('/') + 1) : left;
   const rightName = right.includes('/') ? right.slice(right.lastIndexOf('/') + 1) : right;
   return leftName === rightName;
+}
+
+function enquiryNamesSlug(slug: string): Prisma.EnquiryWhereInput[] {
+  return [
+    { service: slug },
+    { service: { startsWith: `${slug},` } },
+    { service: { endsWith: `,${slug}` } },
+    { service: { contains: `,${slug},` } },
+  ];
 }
 
 export class CatalogueService {
@@ -473,9 +489,12 @@ export class CatalogueService {
   async deleteCategory(id: string, userId: string, ipAddress?: string) {
     const existing = await prisma.serviceCategory.findFirst({
       where: { id, deletedAt: null },
-      include: { _count: { select: { services: true } } },
+      include: { _count: { select: { services: true, works: true } } },
     });
     if (!existing) throw new NotFoundError('Category');
+    if (existing._count.works > 0) {
+      throw new ConflictError('This category still has projects in Our Works. Move or delete them first.');
+    }
     if (existing._count.services > 0) {
       throw new ConflictError('This category still has services, including removed ones. Deactivate the category instead of deleting it.');
     }
@@ -538,6 +557,9 @@ export class CatalogueService {
             slug,
             shortDescription: input.shortDescription,
             description: input.description,
+            seoTitle: input.seoTitle,
+            seoDescription: input.seoDescription,
+            seoKeywords: input.seoKeywords,
             mrp: input.mrp,
             sellingPrice: input.sellingPrice,
             isActive: input.isActive,
@@ -596,6 +618,9 @@ export class CatalogueService {
             ...(input.slug !== undefined ? { slug: input.slug } : {}),
             ...(input.shortDescription !== undefined ? { shortDescription: input.shortDescription } : {}),
             ...(input.description !== undefined ? { description: input.description } : {}),
+            ...(input.seoTitle !== undefined ? { seoTitle: input.seoTitle } : {}),
+            ...(input.seoDescription !== undefined ? { seoDescription: input.seoDescription } : {}),
+            ...(input.seoKeywords !== undefined ? { seoKeywords: input.seoKeywords } : {}),
             ...(input.mrp !== undefined ? { mrp: input.mrp } : {}),
             ...(input.sellingPrice !== undefined ? { sellingPrice: input.sellingPrice } : {}),
             ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
@@ -633,13 +658,21 @@ export class CatalogueService {
   }
 
   async deleteService(id: string, userId: string, ipAddress?: string) {
-    const existing = await prisma.service.findFirst({ where: { id, deletedAt: null } });
-    if (!existing) throw new NotFoundError('Service');
-    await prisma.service.update({
-      where: { id },
-      data: { deletedAt: new Date(), isActive: false },
+    const existing = await prisma.service.findFirst({
+      where: { id, deletedAt: null },
+      include: { category: { select: { slug: true } } },
     });
-    await auditService.log('Service', id, 'DELETE', { name: existing.name, slug: existing.slug }, { deleted: true }, userId, userId, ipAddress);
+    if (!existing) throw new NotFoundError('Service');
+    const namedSlugs = [...new Set([existing.slug, existing.category.slug])];
+    const enquiries = await prisma.enquiry.count({
+      where: { OR: namedSlugs.flatMap(enquiryNamesSlug) },
+    });
+    if (enquiries > 0) {
+      throw new ConflictError('This service is already named on an enquiry. Make it inactive instead of deleting it.');
+    }
+    await prisma.service.delete({ where: { id } });
+    await releaseImage(existing.imageKey, 'service');
+    await auditService.log('Service', id, 'DELETE', { name: existing.name, slug: existing.slug }, null, userId, userId, ipAddress);
     return { id, deleted: true };
   }
 

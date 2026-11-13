@@ -105,6 +105,13 @@ const categories = [
     ],
   },
   {
+    name: 'Waterproofing',
+    slug: 'waterproofing',
+    description: 'Terrace, bathroom and wall waterproofing',
+    sortOrder: 45,
+    services: [],
+  },
+  {
     name: 'Other Services',
     slug: 'other',
     description: 'False ceiling, sealing and more',

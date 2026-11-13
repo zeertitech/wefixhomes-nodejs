@@ -525,6 +525,7 @@ model ServiceCategory {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   services    Service[]
   labels      CategoryLabel[]
+  works       Work[]
 
   @@index([isActive, sortOrder])
   @@index([deletedAt])
@@ -574,6 +575,9 @@ model Service {
   slug             String          @unique
   shortDescription String?         @map("short_description")
   description      String?
+  seoTitle         String?         @map("seo_title") @db.VarChar(70)
+  seoDescription   String?         @map("seo_description") @db.VarChar(160)
+  seoKeywords      String?         @map("seo_keywords") @db.VarChar(255)
   mrp              Decimal         @db.Decimal(10, 2)
   sellingPrice     Decimal         @map("selling_price") @db.Decimal(10, 2)
   imageKey         String?         @map("image_key")
@@ -590,4 +594,61 @@ model Service {
   @@index([isActive, sortOrder])
   @@index([deletedAt])
   @@map("services")
+}
+
+enum WorkStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum WorkImageKind {
+  GALLERY
+  BEFORE
+  AFTER
+}
+
+/// A completed project shown on the public Our Works page.
+/// Image keys use the same stored-file-name convention as services (the service R2 folder).
+model Work {
+  id               String          @id @default(cuid())
+  categoryId       String          @map("category_id")
+  title            String
+  slug             String          @unique
+  shortDescription String?         @map("short_description") @db.VarChar(300)
+  description      String?
+  coverImage       String?         @map("cover_image")
+  location         String?         @db.VarChar(120)
+  propertyType     String?         @map("property_type") @db.VarChar(80)
+  completionDate   DateTime?       @map("completion_date") @db.Date
+  isFeatured       Boolean         @default(false) @map("is_featured")
+  sortOrder        Int             @default(0) @map("sort_order")
+  status           WorkStatus      @default(DRAFT)
+  seoTitle         String?         @map("seo_title") @db.VarChar(70)
+  seoDescription   String?         @map("seo_description") @db.VarChar(160)
+  seoKeywords      String?         @map("seo_keywords") @db.VarChar(255)
+  publishedAt      DateTime?       @map("published_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+  category         ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images           WorkImage[]
+
+  @@index([categoryId, status])
+  @@index([status, isFeatured, sortOrder])
+  @@index([completionDate])
+  @@map("works")
+}
+
+model WorkImage {
+  id        String        @id @default(cuid())
+  workId    String        @map("work_id")
+  imageKey  String        @map("image_key")
+  altText   String?       @map("alt_text") @db.VarChar(160)
+  kind      WorkImageKind @default(GALLERY)
+  sortOrder Int           @default(0) @map("sort_order")
+  createdAt DateTime      @default(now()) @map("created_at")
+  work      Work          @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@index([workId, kind, sortOrder])
+  @@index([imageKey])
+  @@map("work_images")
 }
