@@ -22,6 +22,7 @@ import {
   publicServiceRoutes,
 } from './routes/catalogue.routes';
 import { adminWorkRoutes, publicWorkRoutes } from './routes/works.routes';
+import { adminTestimonialRoutes, publicTestimonialRoutes } from './routes/testimonials.routes';
 
 export async function setupPlugins(app: FastifyInstance) {
   // ── Security headers ──────────────────────────────────────
@@ -96,6 +97,7 @@ export async function setupPlugins(app: FastifyInstance) {
         { name: 'Enquiries', description: 'Public estimate requests and admin follow-up' },
         { name: 'Service catalogue', description: 'Public and admin home-service catalogue' },
         { name: 'Works', description: 'Our Works portfolio projects' },
+        { name: 'Testimonials', description: 'Homepage customer reviews' },
       ],
     },
   });
@@ -131,4 +133,6 @@ export async function setupRoutes(app: FastifyInstance) {
   await app.register(adminUploadRoutes, { prefix: `${prefix}/admin/uploads` });
   await app.register(publicWorkRoutes, { prefix: `${prefix}/works` });
   await app.register(adminWorkRoutes, { prefix: `${prefix}/admin/works` });
+  await app.register(publicTestimonialRoutes, { prefix: `${prefix}/testimonials` });
+  await app.register(adminTestimonialRoutes, { prefix: `${prefix}/admin/testimonials` });
 }

@@ -194,7 +194,7 @@ async function imageStillUsed(imageKey: string, except?: { categoryId?: string; 
   const fileName = imageKey.includes('/') ? imageKey.slice(imageKey.lastIndexOf('/') + 1) : imageKey;
   const folders = storageService.folders();
   const keys = [...new Set([imageKey, fileName, `${folders.category}/${fileName}`, `${folders.service}/${fileName}`])];
-  const [categories, services, workCovers, workImages] = await prisma.$transaction([
+  const [categories, services, workCovers, workImages, avatars] = await prisma.$transaction([
     prisma.serviceCategory.count({
       where: {
         imageKey: { in: keys },
@@ -209,11 +209,12 @@ async function imageStillUsed(imageKey: string, except?: { categoryId?: string; 
     }),
     prisma.work.count({ where: { coverImage: { in: keys } } }),
     prisma.workImage.count({ where: { imageKey: { in: keys } } }),
+    prisma.testimonial.count({ where: { avatarKey: { in: keys } } }),
   ]);
-  return categories + services + workCovers + workImages > 0;
+  return categories + services + workCovers + workImages + avatars > 0;
 }
 
-/** Deletes an image from storage unless a category, service or work still references it. */
+/** Deletes an image from storage unless a category, service, work, or review still references it. */
 export async function releaseImage(
   imageKey: string | null,
   purpose: ImagePurpose,

@@ -652,3 +652,27 @@ model WorkImage {
   @@index([imageKey])
   @@map("work_images")
 }
+
+enum TestimonialStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// A customer review shown in the homepage "What Our Customers Say" section.
+/// Avatar files use the same stored-file-name convention as service images.
+model Testimonial {
+  id           String            @id @default(cuid())
+  customerName String            @map("customer_name") @db.VarChar(80)
+  location     String?           @db.VarChar(120)
+  quote        String            @db.VarChar(600)
+  rating       Int               @default(5)
+  avatarKey    String?           @map("avatar_key")
+  sortOrder    Int               @default(0) @map("sort_order")
+  status       TestimonialStatus @default(DRAFT)
+  publishedAt  DateTime?         @map("published_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@index([status, sortOrder])
+  @@map("testimonials")
+}
